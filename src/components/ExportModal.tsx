@@ -173,116 +173,89 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         progress: 0,
         message: 'Preparing video export...'
       });
-      // Calculate frames with optimized parameters
-      const maxDuration = Math.min(duration, 300);
+      
+      // Smart duration and frame rate optimization for memory efficiency
+      const maxDuration = duration; // Don't limit duration anymore
       const processingFps = Math.min(exportSettings.fps, 30);
       const totalFrames = Math.floor(maxDuration * processingFps);
       const frameInterval = 1 / processingFps;
       
       console.log(`Exporting ${totalFrames} frames at ${processingFps}fps for ${maxDuration}s duration`);
       
-      // Optimize frame capture with larger batches and parallel processing
-      const batchSize = 15; // Reduced batch size for better performance
-      const frames: ImageData[] = [];
-      const frameBatches: Promise<ImageData[]>[] = [];
+      // Memory-efficient streaming approach - process frames in small chunks
+      const streamBatchSize = 5; // Very small batch size to prevent memory overflow
+      const maxMemoryFrames = 50; // Maximum frames to keep in memory at once
       
       // Pre-calculate zoom and text data for all frames to avoid repeated calculations
       const sortedZooms = [...zoomEffects].sort((a, b) => a.startTime - b.startTime);
-      const frameData = Array.from({ length: totalFrames }, (_, j) => {
-        const time = j * frameInterval;
-        const interpolatedZoom = getInterpolatedZoom(time, sortedZooms);
-        return {
-          time,
-          zoomsForFrame: interpolatedZoom ? [interpolatedZoom] : [],
-          textsForFrame: textOverlays.filter(t => time >= t.startTime && time <= t.endTime),
-        };
-      });
       
-      // Process frames in parallel batches
-      for (let i = 0; i < totalFrames; i += batchSize) {
-        const batchEnd = Math.min(i + batchSize, totalFrames);
+      // Write frames to FFmpeg in streaming fashion to avoid memory buildup
+      console.log('Starting streaming frame capture and processing...');
+      
+      for (let i = 0; i < totalFrames; i += streamBatchSize) {
+        const batchEnd = Math.min(i + streamBatchSize, totalFrames);
         setExportProgress(prev => ({
           ...prev,
-          progress: Math.round((i / totalFrames) * 50),
+          progress: Math.round((i / totalFrames) * 70), // Increased progress weight for frame processing
           message: `Capturing frames ${i + 1}-${batchEnd}/${totalFrames}`
         }));
-        const batchFrames = Promise.all(
-          frameData.slice(i, batchEnd).map(({ zoomsForFrame, textsForFrame }) => 
-            videoPlayerRef.current!.captureFrame(zoomsForFrame, textsForFrame)
-          )
+        
+        // Process current batch of frames
+        const batchFrames: ImageData[] = [];
+        for (let j = i; j < batchEnd; j++) {
+          const time = j * frameInterval;
+          const interpolatedZoom = getInterpolatedZoom(time, sortedZooms);
+          const zoomsForFrame = interpolatedZoom ? [interpolatedZoom] : [];
+          const textsForFrame = textOverlays.filter(t => time >= t.startTime && time <= t.endTime);
+          
+          try {
+            const frame = await videoPlayerRef.current!.captureFrame(zoomsForFrame, textsForFrame);
+            batchFrames.push(frame);
+          } catch (error) {
+            console.error(`Failed to capture frame ${j}:`, error);
+            throw new Error(`Frame capture failed at ${time.toFixed(2)}s: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+        
+        // Convert frames to PNG and write to FFmpeg immediately (streaming approach)
+        const offscreenCanvas = new OffscreenCanvas(
+          batchFrames[0]?.width || 1920, 
+          batchFrames[0]?.height || 1080
         );
-        frameBatches.push(batchFrames);
-        // Yield to main thread to prevent UI freezing
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-      
-      // Wait for all batches to complete and flatten the results
-      const batchResults = await Promise.all(frameBatches);
-      frames.push(...batchResults.flat());
-      console.log(`Total frames captured: ${frames.length}`);
-      
-      // Log some sample frames to verify they contain the expected data
-      if (frames.length > 0) {
-        const sampleFrame = frames[0] as ImageData;
-        console.log('Sample frame data:', {
-          width: sampleFrame.width,
-          height: sampleFrame.height,
-          dataLength: sampleFrame.data.length,
-          hasData: sampleFrame.data.some((pixel: number) => pixel !== 0) // Check if frame has non-black pixels
-        });
-      }
-      setExportProgress({
-        stage: 'processing',
-        progress: 50,
-        message: 'Processing frames...'
-      });
-      // Convert frames to PNG blobs with optimized parallel processing
-      console.log('Converting frames to PNG blobs...');
-      const convertBatch = async (frames: ImageData[], startIndex: number, batchSize: number) => {
-        const batchBlobs: Promise<Blob>[] = [];
-        const offscreenCanvas = new OffscreenCanvas(frames[0].width, frames[0].height);
         const ctx = offscreenCanvas.getContext('2d')!;
         
-        for (let i = 0; i < Math.min(batchSize, frames.length - startIndex); i++) {
-          const frame = frames[startIndex + i];
+        for (let j = 0; j < batchFrames.length; j++) {
+          const frameIndex = i + j;
+          const frame = batchFrames[j];
+          
+          // Convert frame to PNG blob
           ctx.putImageData(frame, 0, 0);
-          batchBlobs.push(offscreenCanvas.convertToBlob({ type: 'image/png', quality: 0.8 }));
+          const blob = await offscreenCanvas.convertToBlob({ 
+            type: 'image/png', 
+            quality: 0.85 // Slightly higher quality for better results
+          });
+          
+          // Write directly to FFmpeg
+          const frameNumber = frameIndex.toString().padStart(6, '0');
+          const frameData = await blob.arrayBuffer();
+          await ffmpeg.writeFile(`frame_${frameNumber}.png`, new Uint8Array(frameData));
         }
         
-        return Promise.all(batchBlobs);
-      };
-      // Process frames in parallel batches for blob conversion
-      const blobBatchSize = 15;
-      const blobBatches: Promise<Blob[]>[] = [];
-      
-      for (let i = 0; i < frames.length; i += blobBatchSize) {
-        blobBatches.push(convertBatch(frames as ImageData[], i, blobBatchSize));
-        // Yield to main thread
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-      
-      const blobs = (await Promise.all(blobBatches)).flat();
-      console.log(`All frames converted to blobs. Total blobs: ${blobs.length}`);
-      
-      // Write frames to FFmpeg
-      console.log('Writing frames to FFmpeg...');
-      for (let i = 0; i < blobs.length; i++) {
-        const frameNumber = i.toString().padStart(6, '0');
-        const frameData = await blobs[i].arrayBuffer();
-        await ffmpeg.writeFile(`frame_${frameNumber}.png`, new Uint8Array(frameData));
-        if (i > 0 && i % 10 === 0) {
-            setExportProgress((prev) => ({
-                ...prev,
-                message: `Prepared ${i}/${blobs.length} frames for encoding...`,
-                progress: prev.progress + 2,
-            }));
-            await new Promise((resolve) => setTimeout(resolve, 0)); // Yield to main thread
+        // Clear batch frames from memory immediately
+        batchFrames.length = 0;
+        
+        // Force garbage collection hint and yield to main thread
+        if (typeof window !== 'undefined' && 'gc' in window) {
+          (window as any).gc();
         }
+        await new Promise((resolve) => setTimeout(resolve, 10)); // Longer yield for memory cleanup
       }
-      console.log('All frames written to FFmpeg');
+      
+      console.log('All frames processed and written to FFmpeg using streaming approach');
+      
       setExportProgress({
         stage: 'encoding',
-        progress: 75,
+        progress: 80,
         message: 'Encoding video...'
       });
       // Write audio if included

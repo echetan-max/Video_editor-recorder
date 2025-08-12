@@ -84,11 +84,29 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           requestAnimationFrame(rafCallback);
         });
 
-        // Create capture canvas at video resolution
+        // Create capture canvas with memory-optimized dimensions
         const frameCanvas = document.createElement('canvas');
         const frameCtx = frameCanvas.getContext('2d')!;
-        frameCanvas.width = video.videoWidth;
-        frameCanvas.height = video.videoHeight;
+        
+        // Optimize canvas size for memory efficiency while maintaining quality
+        const maxWidth = 1920;  // Max 1080p width for memory efficiency
+        const maxHeight = 1080; // Max 1080p height for memory efficiency
+        const videoAspectRatio = video.videoWidth / video.videoHeight;
+        
+        let canvasWidth = Math.min(video.videoWidth, maxWidth);
+        let canvasHeight = Math.min(video.videoHeight, maxHeight);
+        
+        // Maintain aspect ratio
+        if (canvasWidth / canvasHeight !== videoAspectRatio) {
+          if (canvasWidth / videoAspectRatio <= maxHeight) {
+            canvasHeight = Math.round(canvasWidth / videoAspectRatio);
+          } else {
+            canvasWidth = Math.round(canvasHeight * videoAspectRatio);
+          }
+        }
+        
+        frameCanvas.width = canvasWidth;
+        frameCanvas.height = canvasHeight;
 
         // Draw the base video frame
         frameCtx.drawImage(video, 0, 0, frameCanvas.width, frameCanvas.height);
@@ -96,7 +114,6 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         // Apply zoom effect passed in (already filtered/interpolated by caller)
         const zoom = zoomEffects[0];
         if (zoom) {
-          console.log(`Applying zoom effect to frame`);
           // Create temp canvas for zoom operation
           const zoomCanvas = document.createElement('canvas');
           const zoomCtx = zoomCanvas.getContext('2d')!;
@@ -127,11 +144,14 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           // Draw zoomed frame
           frameCtx.drawImage(zoomCanvas, 0, 0);
           frameCtx.restore();
+          
+          // Clean up zoom canvas immediately
+          zoomCanvas.width = 0;
+          zoomCanvas.height = 0;
         }
 
         // Apply text overlays passed in (already filtered by caller)
         if (textOverlays.length > 0) {
-          console.log(`Applying ${textOverlays.length} text overlays to frame`);
           frameCtx.textAlign = 'center';
           frameCtx.textBaseline = 'middle';
 
@@ -190,8 +210,14 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           }
         }
 
-        // Return the final frame data
-        return frameCtx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
+        // Get image data and clean up canvas immediately
+        const imageData = frameCtx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
+        
+        // Clean up canvas to free memory
+        frameCanvas.width = 0;
+        frameCanvas.height = 0;
+        
+        return imageData;
       }
     }));
 
