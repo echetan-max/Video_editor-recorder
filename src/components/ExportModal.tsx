@@ -245,7 +245,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       '-map', '0:v:0',
       '-map', '1:a:0',
       '-c:v', 'copy',
-      '-c:a', 'aac', '-b:a', '128k',
+      '-c:a', 'copy',
       '-shortest',
       outName
     ];
@@ -322,7 +322,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       '-pattern_type', 'sequence',
       '-i', 'frame_%06d.jpg',
       ...(inputName ? ['-i', inputName] : []),
+      '-map', '0:v:0',
+      ...(inputName ? ['-map', '1:a:0'] : []),
       '-c:v', 'libx264',
+      ...(inputName ? ['-c:a', 'copy'] : []),
       '-pix_fmt', 'yuv420p',
       '-preset', exportSettings.speedPreset,
       '-crf', '23',
