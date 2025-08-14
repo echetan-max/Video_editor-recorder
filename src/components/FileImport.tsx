@@ -1,17 +1,21 @@
-import React, { useRef } from 'react';
-import { Upload, FileVideo, Sparkles, FileText, Video } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Upload, FileVideo, Sparkles, FileText, Video, X } from 'lucide-react';
 import { ClicksData } from '../types';
-
 
 interface FileImportProps {
   onFileSelect: (file: File) => void;
   onClicksImport?: (clicksData: ClicksData) => void;
+  ffmpegStatus: 'loading' | 'loaded' | 'error';
+  onFfmpegCheck: () => void;
 }
 
 export const FileImport: React.FC<FileImportProps> = ({
   onFileSelect,
-  onClicksImport
+  onClicksImport,
+  ffmpegStatus,
+  onFfmpegCheck,
 }) => {
+  const [showFfmpegWarning, setShowFfmpegWarning] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const clicksInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,9 +76,21 @@ export const FileImport: React.FC<FileImportProps> = ({
     e.preventDefault();
   };
 
+
+  const RECORDER_EXE_URL = "https://github.com/echetan-max/vercel/releases/download/v1.1/screen.exe"; 
+  const downloadExe = () => {
+    const a = document.createElement("a");
+    a.href = RECORDER_EXE_URL;
+    a.download = "AutoZoomRecorder.exe";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#e0eafc] via-[#cfdef3] to-[#e0eafc] flex items-center justify-center p-10">
       <div className="max-w-6xl w-full space-y-10">
+        
         {/* Header */}
         <div className="text-center">
           <div className="flex items-center justify-center space-x-3 mb-4">
@@ -86,18 +102,37 @@ export const FileImport: React.FC<FileImportProps> = ({
           </p>
         </div>
 
+        {/* FFmpeg Warning */}
+        {ffmpegStatus === 'error' && showFfmpegWarning && (
+          <div className="w-full max-w-2xl mx-auto bg-red-800/50 border border-red-700 text-white p-3 rounded-lg flex items-center justify-between">
+            <div>
+              <p className="font-semibold">FFmpeg Components Not Found</p>
+              <p className="text-sm text-red-200">Audio mixing and fallback export may fail. Ensure FFmpeg files are in `/public`.</p>
+              <button
+                onClick={onFfmpegCheck}
+                className="text-sm mt-1 text-red-200 hover:text-white underline"
+              >
+                Retry Check
+              </button>
+            </div>
+            <button onClick={() => setShowFfmpegWarning(false)} className="text-red-200 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         {/* Screen Recorder Section */}
         <div className="flex justify-center">
           <div className="bg-white/60 backdrop-blur-lg border border-purple-300 rounded-2xl p-6 shadow-xl hover:shadow-purple-400 transition-all duration-300 max-w-md w-full">
-            <div className="flex items-center space-x-3 mb-4">
-              <Video className="w-6 h-6 text-purple-700" />
-              <h3 className="text-lg font-semibold text-purple-800">Record Screen</h3>
+            <div className="flex items-center justify-center mb-4">
+              <Video className="w-8 h-8 text-purple-700" />
             </div>
-            <p className="text-purple-700 text-sm mb-4">
-              Capture your screen with automatic click tracking.
+            <h3 className="text-lg font-semibold text-center text-purple-800">AutoZoom Recorder</h3>
+            <p className="text-purple-700 text-sm text-center mb-4">
+              Record your screen with automatic zoom effects
             </p>
             <button
-              onClick={() => window.open('set.html', '_blank')}
+              onClick={downloadExe}
               className="w-full flex items-center justify-center space-x-2 py-3 
               bg-purple-600/80 hover:bg-purple-700/90 
               text-white font-semibold rounded-xl 
@@ -105,13 +140,17 @@ export const FileImport: React.FC<FileImportProps> = ({
               shadow-lg transition-all duration-300"
             >
               <Video className="w-5 h-5" />
-              <span>Launch Screen Recorder</span>
+              <span>Click here to download ⬇</span>
             </button>
+            <p className="text-purple-700 text-xs text-center mt-3">
+              Captures screen with click-based zoom points
+            </p>
           </div>
         </div>
 
         {/* Two-Column: Video and Clicks */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
           {/* Video Import */}
           <div
             className="bg-white/60 backdrop-blur-lg border border-purple-300 rounded-2xl p-10 text-center shadow-xl hover:shadow-purple-400 transition-all duration-300 cursor-pointer"

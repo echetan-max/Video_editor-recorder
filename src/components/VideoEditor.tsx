@@ -5,7 +5,6 @@ import { ZoomControls } from './ZoomControls';
 import { Header } from './Header';
 import { FileImport } from './FileImport';
 import { ExportModal } from './ExportModal';
-
 import { TextOverlayComponent } from './TextOverlay';
 import { ZoomEffect, TextOverlay, getInterpolatedZoom, ClicksData } from '../types';
 
@@ -21,8 +20,10 @@ export const VideoEditor: React.FC = () => {
   const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
   const [previewTextOverlay, setPreviewTextOverlay] = useState<TextOverlay | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+  
 
   const [zoomEnabled, setZoomEnabled] = useState(true);
+  const [ffmpegStatus, setFfmpegStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const videoRef = useRef<VideoPlayerRef>(null);
 
   // Define deleteZoomEffect before using it
@@ -41,7 +42,27 @@ export const VideoEditor: React.FC = () => {
     }
   }, [videoFile]);
 
-  // Add keyboard shortcuts for zoom management
+  const checkFfmpegFiles = useCallback(async () => {
+    setFfmpegStatus('loading');
+    try {
+      const coreJsUrl = new URL('/ffmpeg-core.js', window.location.origin);
+      const coreWasmUrl = new URL('/ffmpeg-core.wasm', window.location.origin);
+      const [jsRes, wasmRes] = await Promise.all([fetch(coreJsUrl), fetch(coreWasmUrl)]);
+      if (jsRes.ok && wasmRes.ok) {
+        setFfmpegStatus('loaded');
+      } else {
+        throw new Error('FFmpeg core files not found on server.');
+      }
+    } catch (e) {
+      console.error("FFmpeg check failed:", e);
+      setFfmpegStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    checkFfmpegFiles();
+  }, [checkFfmpegFiles]);
+
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'Delete' && selectedZoom) {
@@ -97,6 +118,8 @@ export const VideoEditor: React.FC = () => {
   const setPreviewText = (preview: TextOverlay | null) => {
     setPreviewTextOverlay(preview);
   };
+
+
 
   const handleTimeUpdate = (time: number) => {
     setCurrentTime(time);
@@ -181,17 +204,21 @@ export const VideoEditor: React.FC = () => {
         <FileImport
           onFileSelect={setVideoFile}
           onClicksImport={handleClicksImport}
+          ffmpegStatus={ffmpegStatus}
+          onFfmpegCheck={checkFfmpegFiles}
         />
-        
-        
-
       </div>
     );
   }
 
   return (
     <div className="h-screen flex flex-col bg-gray-900">
-      <Header 
+      {ffmpegStatus === 'error' && (
+        <div className="bg-red-800 text-white text-center p-2 text-sm">
+          Warning: Could not load FFmpeg components. Audio mixing and fallback video export may not work.
+        </div>
+       )}
+      <Header
         videoFile={videoFile}
         onExport={() => setShowExportModal(true)}
         onNewProject={resetProject}
@@ -225,7 +252,6 @@ export const VideoEditor: React.FC = () => {
               currentTime={currentTime}
               duration={duration}
               setPreviewText={setPreviewText}
-              previewTextOverlay={previewTextOverlay}
             />
           </div>
         </div>
@@ -281,7 +307,7 @@ export const VideoEditor: React.FC = () => {
           textOverlays={textOverlays}
           duration={duration}
           onClose={() => setShowExportModal(false)}
-          videoPlayerRef={videoRef} // Pass the VideoPlayer ref
+          videoPlayerRef={videoRef}
         />
       )}
 

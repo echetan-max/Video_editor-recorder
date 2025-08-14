@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Download, Settings, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { ZoomEffect, TextOverlay } from '../types';
-import { getInterpolatedZoom } from '../types';
+import { getExportInterpolatedZoom } from '../types';
 import { VideoPlayerRef } from './VideoPlayer';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 
@@ -20,7 +20,7 @@ interface ExportModalProps {
 }
 
 interface ExportProgress {
-  stage: 'initializing' | 'capturing' | 'processing' | 'encoding' | 'complete' | 'error';
+  stage: 'initializing' | 'capturing' | 'processing' | 'encoding' | 'complete' | 'error' | 'cancelled';
   progress: number;
   message: string;
   error?: string;
@@ -41,6 +41,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     speedPreset: 'veryfast' as 'ultrafast' | 'superfast' | 'veryfast' | 'faster' | 'fast' // fallback only
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const isCancelled = useRef(false);
 
   useEffect(() => {
     if (!DEBUG_EXPORT) return;
@@ -51,10 +53,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   // FFmpeg (fallback + audio mux)
   useEffect(() => {
+    isCancelled.current = false;
+    const ffmpegInstance = new FFmpeg();
     (async () => {
       try {
         setExportProgress({ stage: 'initializing', progress: 10, message: 'Loading FFmpeg...' });
-        const ffmpegInstance = new FFmpeg();
         ffmpegInstance.on('log', ({ message }: { message: string }) => { if (DEBUG_EXPORT) console.log('[ffmpeg]', message); });
         ffmpegInstance.on('progress', (p: { progress: number }) => {
           const percent = Math.round((p.progress ?? 0) * 100);
@@ -68,7 +71,26 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         console.warn('FFmpeg load failed (will still try WebCodecs):', e);
       }
     })();
+    return () => {
+      isCancelled.current = true;
+      try {
+        ffmpegInstance.terminate();
+      } catch {
+        // ignore
+      }
+    };
   }, []);
+
+  const handleCancel = () => {
+    isCancelled.current = true;
+    if (ffmpeg) {
+      try {
+        ffmpeg.terminate();
+      } catch (e) {
+        console.warn('ffmpeg terminate error', e);
+      }
+    }
+  };
 
   // helpers
   const pad6 = (n: number) => n.toString().padStart(6, '0');
@@ -158,8 +180,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     const scaleCtx = scaleCanvas ? scaleCanvas.getContext('2d', { alpha: false })! : null;
 
     for (let i = 0; i < totalFrames; i++) {
+      if (isCancelled.current) { dbg('webcodec capture loop cancelled'); return null; }
       const t = i / fps;
-      const z = getInterpolatedZoom(t, sortedZooms);
+      const z = getExportInterpolatedZoom(t, sortedZooms);
       const zooms = z ? [z] : [];
       const texts = textOverlays.filter(ov => t >= ov.startTime && t <= ov.endTime);
 
@@ -195,6 +218,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       videoPlayerRef.current?.updateExportProgress(98, 'Finalizing…');
       return videoOnly;
     }
+
+    if (isCancelled.current) { dbg('webcodec mux cancelled'); return null; }
 
     setExportProgress({ stage: 'processing', progress: 92, message: 'Muxing audio…' });
     videoPlayerRef.current?.updateExportProgress(92, 'Muxing audio…');
@@ -256,8 +281,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     videoPlayerRef.current?.updateExportProgress(0, 'Capturing frames…');
 
     for (let i = 0; i < totalFrames; i++) {
+      if (isCancelled.current) { dbg('ffmpeg capture loop cancelled'); return null; }
       const t = i / fps;
-      const z = getInterpolatedZoom(t, sortedZooms);
+      const z = getExportInterpolatedZoom(t, sortedZooms);
       const zooms = z ? [z] : [];
       const texts = textOverlays.filter(ov => t >= ov.startTime && t <= ov.endTime);
 
@@ -273,6 +299,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         await new Promise(r => setTimeout(r, 0));
       }
     }
+
+    if (isCancelled.current) { dbg('ffmpeg encode cancelled'); return null; }
 
     setExportProgress({ stage: 'encoding', progress: 65, message: 'Encoding MP4…' });
     videoPlayerRef.current?.updateExportProgress(70, 'Encoding MP4…');
@@ -309,6 +337,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   const exportVideo = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+
     try {
       if (!videoPlayerRef.current) {
         setExportProgress({ stage: 'error', progress: 0, message: 'VideoPlayer not available', error: 'No player ref' });
@@ -327,7 +358,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       } catch (e) {
         console.warn('WebCodecs path failed, falling back:', e);
       }
-      if (!finalBlob) finalBlob = await exportWithFFmpeg();
+      if (!finalBlob && !isCancelled.current) finalBlob = await exportWithFFmpeg();
+
+      if (isCancelled.current || !finalBlob) {
+        videoPlayerRef.current.endExport();
+        setExportProgress({ stage: 'cancelled', progress: 0, message: 'Export cancelled' });
+        return;
+      }
 
       setExportProgress({ stage: 'processing', progress: Math.max(exportProgress.progress, 98), message: 'Saving…' });
       videoPlayerRef.current.updateExportProgress(98, 'Saving…');
@@ -345,6 +382,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
       setTimeout(() => onClose(), 1000);
     } catch (error) {
+      if (isCancelled.current || (error instanceof Error && (error.message.includes('process exited with code') || error.message.includes('exit')))) {
+         console.warn('FFmpeg process was likely cancelled.');
+         videoPlayerRef.current?.endExport();
+         setExportProgress({ stage: 'cancelled', progress: 0, message: 'Export cancelled' });
+         return;
+      }
       console.error('Export error:', error);
       videoPlayerRef.current?.endExport();
       setExportProgress({
@@ -353,16 +396,28 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         message: 'Export failed',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+    } finally {
+      setIsExporting(false);
     }
   };
 
   const ProgressIcon = () => {
     switch (exportProgress.stage) {
       case 'complete': return <CheckCircle className="w-5 h-5" />;
-      case 'error': return <AlertCircle className="w-5 h-5" />;
+      case 'error':
+      case 'cancelled':
+        return <AlertCircle className="w-5 h-5" />;
       default: return <Clock className="w-5 h-5" />;
     }
   };
+
+  const handleCloseButton = () => {
+    if (exportProgress.stage === 'capturing' || exportProgress.stage === 'processing' || exportProgress.stage === 'encoding') {
+      handleCancel();
+    } else {
+      onClose();
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -372,9 +427,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Export Video</h2>
             <button
-              onClick={onClose}
+              onClick={handleCloseButton}
               className="text-gray-400 hover:text-white transition-colors"
-              disabled={exportProgress.stage === 'capturing' || exportProgress.stage === 'processing' || exportProgress.stage === 'encoding'}
             >
               <X className="w-6 h-6" />
             </button>
@@ -471,8 +525,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <div className="mb-6">
               <div className="flex items-center space-x-3 mb-3">
                 <ProgressIcon />
-                <span className={`font-medium ${exportProgress.stage === 'complete' ? 'text-green-500' : exportProgress.stage === 'error' ? 'text-red-500' : 'text-blue-500'}`}>
-                  {exportProgress.message} <span className="ml-2 text-gray-300">{exportProgress.progress}%</span>
+                <span className={`font-medium ${exportProgress.stage === 'complete' ? 'text-green-500' : (exportProgress.stage === 'error' || exportProgress.stage === 'cancelled') ? 'text-red-500' : 'text-blue-500'}`}>
+                  {exportProgress.message} <span className="ml-2 text-gray-300">{exportProgress.progress > 0 ? `${exportProgress.progress}%` : ''}</span>
                 </span>
               </div>
               <div className="w-full bg-gray-700 rounded-full h-2">
@@ -489,7 +543,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <div className="flex space-x-4">
             <button
               onClick={exportVideo}
-              disabled={exportProgress.stage === 'capturing' || exportProgress.stage === 'processing' || exportProgress.stage === 'encoding'}
+              disabled={isExporting || exportProgress.stage === 'capturing' || exportProgress.stage === 'processing' || exportProgress.stage === 'encoding'}
               className="flex-1 flex items-center justify-center space-x-2 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
             >
               <Download className="w-5 h-5" />
@@ -499,9 +553,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </span>
             </button>
             <button
-              onClick={onClose}
-              disabled={exportProgress.stage === 'capturing' || exportProgress.stage === 'processing' || exportProgress.stage === 'encoding'}
-              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              onClick={handleCloseButton}
+              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
             >
               Cancel
             </button>
