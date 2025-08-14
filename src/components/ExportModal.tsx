@@ -68,7 +68,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         setIsLoaded(true);
         setExportProgress({ stage: 'initializing', progress: 100, message: 'FFmpeg loaded' });
       } catch (e) {
-        console.warn('FFmpeg load failed (will still try WebCodecs):', e);
+        if (e instanceof Error && e.message.includes('called FFmpeg.terminate()')) {
+          dbg('FFmpeg.load() interrupted by cleanup, probably due to React StrictMode. This is expected.');
+        } else {
+          console.warn('FFmpeg load failed (will still try WebCodecs):', e);
+        }
       }
     })();
     return () => {
@@ -105,7 +109,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   const tryWebCodecsH264 = async (width: number, height: number, fps: number) => {
-    if (!('VideoEncoder' in window) || !('VideoFrame' in window)) return null;
+    if (!('VideoEncoder' in window) || !window.VideoEncoder.isConfigSupported) return null;
     const candidates = [
       { codec: 'avc1.640028' }, // High@L4.0
       { codec: 'avc1.4D4028' }, // Main@L4.0
@@ -114,7 +118,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     for (const c of candidates) {
       try {
         const sup = await window.VideoEncoder.isConfigSupported({
-          ...c, width, height, framerate: fps, hardwareAcceleration: 'prefer-hardware', bitrate: 8_000_000, bitrateMode: 'constant'
+          ...c, width, height, framerate: fps
         });
         if (sup?.supported) return sup.config;
       } catch (e) { console.warn('Codec probe failed:', e); }

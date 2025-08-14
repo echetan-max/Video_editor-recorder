@@ -45,9 +45,10 @@ export const VideoEditor: React.FC = () => {
   const checkFfmpegFiles = useCallback(async () => {
     setFfmpegStatus('loading');
     try {
-      const coreJsUrl = new URL('/ffmpeg-core.js', window.location.origin);
-      const coreWasmUrl = new URL('/ffmpeg-core.wasm', window.location.origin);
-      const [jsRes, wasmRes] = await Promise.all([fetch(coreJsUrl), fetch(coreWasmUrl)]);
+      const [jsRes, wasmRes] = await Promise.all([
+        fetch('/ffmpeg-core.js'),
+        fetch('/ffmpeg-core.wasm')
+      ]);
       if (jsRes.ok && wasmRes.ok) {
         setFfmpegStatus('loaded');
       } else {
@@ -145,24 +146,16 @@ export const VideoEditor: React.FC = () => {
 
   const handleClicksImport = (clicksData: ClicksData) => {
     if (clicksData.clicks && Array.isArray(clicksData.clicks)) {
-      const times = clicksData.clicks.map(c => c.time || c.timestamp || 0);
-      const isEpoch = Math.min(...times) > 1e6;
-      const baseTime = isEpoch ? Math.min(...times) : 0;
-
-      const duration = typeof clicksData.duration === 'number'
-        ? clicksData.duration
-        : Math.max(...times.map(t => t - baseTime));
-
       const newZoomEffects: ZoomEffect[] = clicksData.clicks.map((click) => {
-        const normalizedTime = (click.time || click.timestamp || 0) - baseTime;
-        const endTime = normalizedTime + (click.duration || 2.0);
+        const startTime = click.time || click.timestamp || 0;
+        const endTime = startTime + (click.duration || 2.0);
         const width = click.width || clicksData.width;
         const height = click.height || clicksData.height;
 
         return {
           id: crypto.randomUUID(),
-          startTime: Math.max(0, Math.min(normalizedTime, duration)),
-          endTime: Math.max(0, Math.min(endTime, duration)),
+          startTime: startTime,
+          endTime: endTime,
           x: (click.x / width) * 100,
           y: (click.y / height) * 100,
           scale: click.zoomLevel || 2.0,
