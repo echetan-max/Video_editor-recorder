@@ -51,9 +51,6 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     });
     const suppressTimeUpdateRef = useRef(false);
 
-    // Track the last zoom point for proper zoom out
-    const lastZoomPointRef = useRef<{x: number, y: number} | null>(null);
-
     /** drawer that returns a fully drawn canvas (no ImageData) */
     const drawFrameToCanvas = async (zoomEffects: ZoomEffect[], overlays: TextOverlay[]) => {
       if (!videoRef.current || !isVideoReady) throw new Error('Video not ready for capture');
@@ -237,64 +234,23 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // Handle zoom changes with simple, direct transitions
+    // Handle zoom changes - simple and direct
     useEffect(() => {
       if (!videoWrapperRef.current) return;
       
-      console.log('Zoom change:', { 
-        currentZoom, 
-        lastPoint: lastZoomPointRef.current,
-        isDefault: currentZoom?.id === 'default'
-      });
-      
-      if (currentZoom && currentZoom.id !== 'default') {
+      if (currentZoom) {
         const { x, y, scale } = currentZoom;
         
-        // Remember this zoom point for zoom out
-        lastZoomPointRef.current = { x, y };
-        console.log('Setting zoom point:', { x, y });
-        
-        // Set transform-origin to zoom point for direct scaling
+        // Apply zoom directly - interpolation function handles transitions
         videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
         videoWrapperRef.current.style.transform = `scale(${scale})`;
-        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+        videoWrapperRef.current.style.transition = 'transform 0.15s ease-out';
         videoWrapperRef.current.style.willChange = 'transform';
-      } else if (currentZoom && currentZoom.id === 'default') {
-        // This is a default zoom (zoom out) - use the last zoom point if available
-        const lastPoint = lastZoomPointRef.current;
-        console.log('Default zoom detected - using last point:', lastPoint);
-        
-        if (lastPoint) {
-          // Scale down from the last zoom point
-          console.log('Applying zoom out from point:', `${lastPoint.x}% ${lastPoint.y}%`);
-          videoWrapperRef.current.style.transformOrigin = `${lastPoint.x}% ${lastPoint.y}%`;
-          videoWrapperRef.current.style.transform = 'scale(1)';
-          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
-          videoWrapperRef.current.style.willChange = 'transform';
-          
-          // Clear the last zoom point after transition completes
-          setTimeout(() => {
-            if (videoWrapperRef.current && currentZoom?.id === 'default') {
-              console.log('Resetting to center after zoom out complete');
-              videoWrapperRef.current.style.transformOrigin = '50% 50%';
-              videoWrapperRef.current.style.willChange = 'auto';
-            }
-            lastZoomPointRef.current = null;
-          }, 500);
-        } else {
-          console.log('No previous zoom point, using center');
-          // No previous zoom point, use center
-          videoWrapperRef.current.style.transformOrigin = '50% 50%';
-          videoWrapperRef.current.style.transform = 'scale(1)';
-          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
-          videoWrapperRef.current.style.willChange = 'auto';
-        }
       } else {
-        // No current zoom at all
-        console.log('No current zoom');
+        // No zoom
         videoWrapperRef.current.style.transformOrigin = '50% 50%';
         videoWrapperRef.current.style.transform = 'scale(1)';
-        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+        videoWrapperRef.current.style.transition = 'transform 0.15s ease-out';
         videoWrapperRef.current.style.willChange = 'auto';
       }
     }, [currentZoom]);
