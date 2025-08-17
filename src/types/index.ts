@@ -67,20 +67,30 @@ export function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-// --- Export-specific zoom interpolation - NO TRANSITIONS, just exact values ---
+// --- Export-specific zoom interpolation - EXACTLY matches preview smooth transitions ---
 export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffect | null {
   if (!zooms.length) {
     return null; // No zoom effects
   }
 
-  // Sort zooms by start time
+  // Use the EXACT SAME logic as the preview for perfect sync
   const sorted = [...zooms].sort((a, b) => a.startTime - b.startTime);
   
+  // Before first zoom: no zoom (normal view)
+  if (time < sorted[0].startTime) {
+    return null; // No zoom effect
+  }
+
+  // After last zoom: no zoom (normal view)
+  if (time > sorted[sorted.length - 1].endTime) {
+    return null; // No zoom effect
+  }
+
   // Find the active zoom for this exact time
   for (let i = 0; i < sorted.length; i++) {
     const zoom = sorted[i];
     
-    // If we're within this zoom's time range, return it exactly (no interpolation)
+    // If we're within this zoom's time range, return it exactly (same as preview)
     if (time >= zoom.startTime && time <= zoom.endTime) {
       return zoom;
     }
