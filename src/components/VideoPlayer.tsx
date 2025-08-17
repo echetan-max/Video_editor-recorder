@@ -236,51 +236,40 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // preview transform with smooth, natural zoom transitions
+    // SMOOTH ZOOM TRANSITIONS - Fast, smooth, no jerks
     useEffect(() => {
-      // Clear any existing timeout
-      if (zoomTimeoutRef.current) {
-        clearTimeout(zoomTimeoutRef.current);
-      }
-      
-      // Debounce zoom changes to prevent rapid updates
-      zoomTimeoutRef.current = setTimeout(() => {
+      if (videoWrapperRef.current) {
         if (currentZoom) {
           const { x, y, scale } = currentZoom;
           
-          // Store the zoom position for smooth zoom out
+          // Store zoom position for smooth zoom out
           lastZoomPositionRef.current = { x, y };
           
-          if (videoWrapperRef.current) {
-            // Direct zoom IN to target point - zoom in place at target location
-            videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)})`;
-            videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`; // Zoom from target point, not center
-            videoWrapperRef.current.style.transition = 'transform 3s ease'; // SLOW transition to observe behavior
-            videoWrapperRef.current.style.willChange = 'transform';
-          }
+          // SMOOTH ZOOM IN - One clean transition
+          videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)})`;
+          videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
+          videoWrapperRef.current.style.transition = 'transform 0.8s ease-out';
+          videoWrapperRef.current.style.willChange = 'transform';
         } else {
-          if (videoWrapperRef.current) {
-            // PERFECT ZOOM OUT: Smooth transition from zoom point (75%, 8%) back to fullscreen (1x)
-            const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
-            
-            // Create a smooth, direct path from zoom point back to fullscreen
-            // This eliminates all pivoting and center concentration issues
-            videoWrapperRef.current.style.transform = 'scale(1)';
-            videoWrapperRef.current.style.transformOrigin = `${lastPos.x}% ${lastPos.y}%`; // Zoom out FROM the zoom point
-            videoWrapperRef.current.style.transition = 'transform 3s ease';
-            videoWrapperRef.current.style.willChange = 'transform';
-            
-            // After transition completes, clean reset to normal view
-            setTimeout(() => {
-              if (videoWrapperRef.current) {
-                videoWrapperRef.current.style.transform = 'none';
-                videoWrapperRef.current.style.transition = 'none';
-                videoWrapperRef.current.style.willChange = 'auto';
-              }
-            }, 3000);
-          }
+          // SMOOTH ZOOM OUT - One clean transition back to fullscreen
+          const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
+          
+          // Single smooth transition: scale down while moving to center
+          videoWrapperRef.current.style.transform = 'scale(1)';
+          videoWrapperRef.current.style.transformOrigin = 'center center';
+          videoWrapperRef.current.style.transition = 'transform 0.8s ease-out';
+          videoWrapperRef.current.style.willChange = 'transform';
+          
+          // Clean reset after transition
+          setTimeout(() => {
+            if (videoWrapperRef.current) {
+              videoWrapperRef.current.style.transform = 'none';
+              videoWrapperRef.current.style.transition = 'none';
+              videoWrapperRef.current.style.willChange = 'auto';
+            }
+          }, 800);
         }
-      }, 16); // 16ms debounce (roughly 60fps)
+      }
     }, [currentZoom]);
 
     const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
