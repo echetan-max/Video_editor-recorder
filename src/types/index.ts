@@ -90,9 +90,6 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
   // Sort zooms by start time
   const sorted = [...zooms].sort((a, b) => a.startTime - b.startTime);
   
-  // Add a small transition buffer for smooth zoom out
-  const transitionBuffer = 0.3; // 300ms buffer for zoom out
-  
   // Before first zoom: no zoom (normal view)
   if (time < sorted[0].startTime) {
     return {
@@ -106,7 +103,20 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
     };
   }
 
-  // Find the active zoom or handle zoom out transition
+  // After last zoom: no zoom (normal view)
+  if (time > sorted[sorted.length - 1].endTime) {
+    return {
+      id: 'default',
+      startTime: sorted[sorted.length - 1].endTime,
+      endTime: Number.MAX_SAFE_INTEGER,
+      x: 50,
+      y: 50,
+      scale: 1.0,
+      transition: 'smooth',
+    };
+  }
+
+  // Find the active zoom
   for (let i = 0; i < sorted.length; i++) {
     const currentZoom = sorted[i];
     
@@ -114,37 +124,6 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
     if (time >= currentZoom.startTime && time <= currentZoom.endTime) {
       return currentZoom;
     }
-    
-    // Handle zoom out transition - small buffer after zoom ends
-    if (time > currentZoom.endTime && time <= currentZoom.endTime + transitionBuffer) {
-      const progress = (time - currentZoom.endTime) / transitionBuffer;
-      const t = Math.max(0, Math.min(1, progress));
-      
-      // Smoothly transition from zoom point to center
-      return {
-        id: `zoom-out-${currentZoom.id}`,
-        startTime: currentZoom.endTime,
-        endTime: currentZoom.endTime + transitionBuffer,
-        x: lerp(currentZoom.x, 50, t),
-        y: lerp(currentZoom.y, 50, t),
-        scale: lerp(currentZoom.scale, 1.0, t),
-        transition: currentZoom.transition,
-      };
-    }
-  }
-
-  // After all zooms: no zoom (normal view)
-  const lastZoom = sorted[sorted.length - 1];
-  if (time > lastZoom.endTime + transitionBuffer) {
-    return {
-      id: 'default',
-      startTime: lastZoom.endTime + transitionBuffer,
-      endTime: Number.MAX_SAFE_INTEGER,
-      x: 50,
-      y: 50,
-      scale: 1.0,
-      transition: 'smooth',
-    };
   }
 
   // If we're not in any zoom range, return normal view (no zoom)

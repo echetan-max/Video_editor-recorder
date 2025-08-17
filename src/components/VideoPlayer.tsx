@@ -51,6 +51,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     });
     const suppressTimeUpdateRef = useRef(false);
 
+    // Track the current zoom point to maintain it during zoom out
+    const currentZoomPointRef = useRef<{x: number, y: number} | null>(null);
+
     /** drawer that returns a fully drawn canvas (no ImageData) */
     const drawFrameToCanvas = async (zoomEffects: ZoomEffect[], overlays: TextOverlay[]) => {
       if (!videoRef.current || !isVideoReady) throw new Error('Video not ready for capture');
@@ -234,24 +237,46 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // Handle zoom changes - simple and direct
+    // Simple zoom handling - use zoom point as transform-origin to prevent curved paths
     useEffect(() => {
       if (!videoWrapperRef.current) return;
       
       if (currentZoom) {
         const { x, y, scale } = currentZoom;
         
-        // Apply zoom directly - interpolation function handles transitions
+        // Save the current zoom point
+        currentZoomPointRef.current = { x, y };
+        
+        // Key fix: Set transform-origin to the zoom point for direct scaling
         videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
         videoWrapperRef.current.style.transform = `scale(${scale})`;
-        videoWrapperRef.current.style.transition = 'transform 0.15s ease-out';
+        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
         videoWrapperRef.current.style.willChange = 'transform';
       } else {
-        // No zoom
-        videoWrapperRef.current.style.transformOrigin = '50% 50%';
-        videoWrapperRef.current.style.transform = 'scale(1)';
-        videoWrapperRef.current.style.transition = 'transform 0.15s ease-out';
-        videoWrapperRef.current.style.willChange = 'auto';
+        // Zoom out: use the last zoom point if available to scale down from there
+        const lastPoint = currentZoomPointRef.current;
+        
+        if (lastPoint) {
+          // Scale down from the zoom point, not from center
+          videoWrapperRef.current.style.transformOrigin = `${lastPoint.x}% ${lastPoint.y}%`;
+          videoWrapperRef.current.style.transform = 'scale(1)';
+          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+          videoWrapperRef.current.style.willChange = 'transform';
+          
+          // Reset to center after zoom out completes
+          setTimeout(() => {
+            if (videoWrapperRef.current && !currentZoom) {
+              videoWrapperRef.current.style.transformOrigin = '50% 50%';
+            }
+            currentZoomPointRef.current = null;
+          }, 300);
+        } else {
+          // No previous zoom point, use center
+          videoWrapperRef.current.style.transformOrigin = '50% 50%';
+          videoWrapperRef.current.style.transform = 'scale(1)';
+          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+          videoWrapperRef.current.style.willChange = 'auto';
+        }
       }
     }, [currentZoom]);
 
