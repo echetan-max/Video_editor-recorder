@@ -236,38 +236,29 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // LINEAR ZOOM TRANSITIONS - Fast, straight-line paths, no curves
+    // INSTANT ZOOM TRANSITIONS - Direct snap to position, no movement paths
     useEffect(() => {
       if (videoWrapperRef.current) {
         if (currentZoom) {
           const { x, y, scale } = currentZoom;
           
-          // Store zoom position for smooth zoom out
+          // Store zoom position for instant zoom out
           lastZoomPositionRef.current = { x, y };
           
-          // LINEAR ZOOM IN - Straight line to target point
+          // INSTANT ZOOM IN - Direct snap to target point (no movement)
           videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)})`;
           videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
-          videoWrapperRef.current.style.transition = 'transform 0.8s linear';
+          videoWrapperRef.current.style.transition = 'none'; // NO TRANSITION = instant snap
           videoWrapperRef.current.style.willChange = 'transform';
         } else {
-          // LINEAR ZOOM OUT - Straight line back to fullscreen
+          // INSTANT ZOOM OUT - Direct snap back to fullscreen (no movement)
           const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
           
-          // Single linear transition: scale down while moving to center
+          // Instant snap: scale down and return to center
           videoWrapperRef.current.style.transform = 'scale(1)';
           videoWrapperRef.current.style.transformOrigin = 'center center';
-          videoWrapperRef.current.style.transition = 'transform 0.8s linear';
-          videoWrapperRef.current.style.willChange = 'transform';
-          
-          // Clean reset after transition
-          setTimeout(() => {
-            if (videoWrapperRef.current) {
-              videoWrapperRef.current.style.transform = 'none';
-              videoWrapperRef.current.style.transition = 'none';
-              videoWrapperRef.current.style.willChange = 'auto';
-            }
-          }, 800);
+          videoWrapperRef.current.style.transition = 'none'; // NO TRANSITION = instant snap
+          videoWrapperRef.current.style.willChange = 'auto';
         }
       }
     }, [currentZoom]);
