@@ -67,42 +67,12 @@ export function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-// --- Export-specific zoom interpolation with smooth transitions ---
+// --- Export-specific zoom interpolation with INSTANT snapping ---
 export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffect {
   const activeZoom = getInterpolatedZoom(time, zooms);
 
-  // If there's no specific zoom, or if it's an instant transition, return it directly
-  if (activeZoom.id === 'default' || activeZoom.transition === 'instant') {
-    return activeZoom;
-  }
-
-  // Apply fast, direct transitions to the active zoom
-  const zoomDuration = activeZoom.endTime - activeZoom.startTime;
-  const transitionDuration = Math.min(0.3, zoomDuration / 4); // 0.3s or 1/4 of zoom duration for faster, direct feel
-
-  // Smooth transition in
-  if (time < activeZoom.startTime + transitionDuration) {
-    const t = (time - activeZoom.startTime) / transitionDuration;
-    return {
-      ...activeZoom,
-      x: lerp(50, activeZoom.x, t),
-      y: lerp(50, activeZoom.y, t),
-      scale: lerp(1.0, activeZoom.scale, t),
-    };
-  }
-
-  // Smooth transition out
-  if (time > activeZoom.endTime - transitionDuration) {
-    const t = (activeZoom.endTime - time) / transitionDuration;
-    return {
-      ...activeZoom,
-      x: lerp(50, activeZoom.x, t),
-      y: lerp(50, activeZoom.y, t),
-      scale: lerp(1.0, activeZoom.scale, t),
-    };
-  }
-
-  // If we are in the middle of the zoom (not in a transition period), return the zoom as is
+  // For export, use the same logic as preview to ensure consistency
+  // Since preview now uses instant snapping, export will also be instant
   return activeZoom;
 }
 
