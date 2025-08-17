@@ -247,7 +247,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           // SMOOTH ZOOM IN - Natural smooth transition to target point
           videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)})`;
           videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
-          videoWrapperRef.current.style.transition = 'transform 0.4s ease'; // SMOOTH, natural feel
+          videoWrapperRef.current.style.transition = 'transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1)'; // SUPER SMOOTH, no jerks
           videoWrapperRef.current.style.willChange = 'transform';
         } else {
           // SMOOTH ZOOM OUT - Natural smooth transition FROM ZOOM SPOT back to fullscreen
@@ -256,11 +256,11 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           // Smooth transition: scale down FROM THE ZOOM SPOT (not center)
           videoWrapperRef.current.style.transform = 'scale(1)';
           videoWrapperRef.current.style.transformOrigin = `${lastPos.x}% ${lastPos.y}%`; // FROM ZOOM SPOT
-          videoWrapperRef.current.style.transition = 'transform 0.4s ease'; // SMOOTH, natural feel
+          videoWrapperRef.current.style.transition = 'transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1)'; // SUPER SMOOTH, no jerks
           videoWrapperRef.current.style.willChange = 'auto';
         }
       }
-    }, [currentZoom]);
+    }, [currentZoom?.id, currentZoom?.startTime, currentZoom?.endTime]); // Only trigger on actual zoom changes, not continuous updates
 
     const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -336,7 +336,11 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
           <div
             className="relative w-full h-full max-w-full max-h-full"
-            style={{ transformStyle: 'flat' }}
+            style={{ 
+              transformStyle: 'preserve-3d',
+              backfaceVisibility: 'hidden',
+              perspective: '1000px'
+            }}
             ref={videoWrapperRef}
           >
             <video
