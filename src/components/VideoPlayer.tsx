@@ -51,6 +51,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     });
     const suppressTimeUpdateRef = useRef(false);
     const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastZoomPositionRef = useRef<{x: number, y: number} | null>(null);
 
     /** drawer that returns a fully drawn canvas (no ImageData) */
     const drawFrameToCanvas = async (zoomEffects: ZoomEffect[], overlays: TextOverlay[]) => {
@@ -247,6 +248,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         if (currentZoom) {
           const { x, y, scale } = currentZoom;
           
+          // Store the zoom position for smooth zoom out
+          lastZoomPositionRef.current = { x, y };
+          
           if (videoWrapperRef.current) {
             // Direct zoom IN to target point - zoom in place at target location
             videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)})`;
@@ -256,9 +260,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           }
         } else {
           if (videoWrapperRef.current) {
-            // Direct zoom OUT from zoom point back to fullscreen - no center transition
+            // Direct zoom OUT from last zoom point back to fullscreen - no center transition
+            const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
             videoWrapperRef.current.style.transform = 'none';
-            videoWrapperRef.current.style.transformOrigin = 'center center'; // Reset to center for normal view
+            videoWrapperRef.current.style.transformOrigin = `${lastPos.x}% ${lastPos.y}%`; // Zoom out from last zoom point
             videoWrapperRef.current.style.transition = 'transform 0.3s ease'; // Smooth, natural movement
             videoWrapperRef.current.style.willChange = 'auto';
           }
