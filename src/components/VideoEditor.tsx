@@ -263,8 +263,11 @@ export const VideoEditor: React.FC = () => {
               const sortedZooms = [...zoomEffects].sort((a, b) => a.startTime - b.startTime);
               const interpolatedZoom = getInterpolatedZoom(currentTime, sortedZooms);
               
-              // Always return the interpolated zoom, even if it's the default zoom-out
-              // This ensures the preview shows the correct zoom state at all times
+              // Only return zoom if it's an actual zoom effect, not the default state
+              // This allows VideoPlayer to properly handle zoom out when currentZoom is null
+              if (interpolatedZoom.id === 'default' && interpolatedZoom.scale === 1.0) {
+                return null; // No zoom effect - VideoPlayer will handle zoom out
+              }
               return interpolatedZoom;
             })()}
             textOverlays={textOverlays}
