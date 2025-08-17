@@ -251,12 +251,12 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           videoWrapperRef.current.style.transition = 'transform 0.4s ease'; // SMOOTH, natural feel
           videoWrapperRef.current.style.willChange = 'transform';
         } else {
-          // SMOOTH ZOOM OUT - Natural smooth transition back to fullscreen
+          // SMOOTH ZOOM OUT - Natural smooth transition FROM ZOOM SPOT back to fullscreen
           const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
           
-          // Smooth transition: scale down and return to center
+          // Smooth transition: scale down FROM THE ZOOM SPOT (not center)
           videoWrapperRef.current.style.transform = 'scale(1)';
-          videoWrapperRef.current.style.transformOrigin = 'center center';
+          videoWrapperRef.current.style.transformOrigin = `${lastPos.x}% ${lastPos.y}%`; // FROM ZOOM SPOT
           videoWrapperRef.current.style.transition = 'transform 0.4s ease'; // SMOOTH, natural feel
           videoWrapperRef.current.style.willChange = 'auto';
         }
