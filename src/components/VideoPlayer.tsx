@@ -13,6 +13,7 @@ interface VideoPlayerProps {
   onPlay: () => void;
   onPause: () => void;
   currentZoom: ZoomEffect | null;
+  zoomEffectsVersion?: number; // Force preview updates when zoom effects change
   textOverlays: TextOverlay[];
   previewTextOverlay?: TextOverlay | null;
   onVideoClick: (x: number, y: number) => void;
@@ -33,7 +34,7 @@ export interface VideoPlayerRef {
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
-  ({ src, currentTime, isPlaying, onTimeUpdate, onLoadedMetadata, onPlay, onPause, currentZoom, textOverlays, previewTextOverlay, onVideoClick, onSeeked }, ref) => {
+  ({ src, currentTime, isPlaying, onTimeUpdate, onLoadedMetadata, onPlay, onPause, currentZoom, zoomEffectsVersion, textOverlays, previewTextOverlay, onVideoClick, onSeeked }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const videoWrapperRef = useRef<HTMLDivElement>(null);
@@ -260,7 +261,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           videoWrapperRef.current.style.willChange = 'auto';
         }
       }
-    }, [currentZoom?.id, currentZoom?.startTime, currentZoom?.endTime]); // Only trigger on actual zoom changes, not continuous updates
+    }, [currentZoom?.id, currentZoom?.startTime, currentZoom?.endTime, zoomEffectsVersion]); // Force update when zoom effects change
 
     const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
