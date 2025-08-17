@@ -246,21 +246,19 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       zoomTimeoutRef.current = setTimeout(() => {
         if (currentZoom) {
           const { x, y, scale } = currentZoom;
-          const offsetX = (50 - x) * (scale - 1);
-          const offsetY = (50 - y) * (scale - 1);
           
           if (videoWrapperRef.current) {
-            // Smooth zoom IN with natural, gentle movement
-            videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)}) translate(${offsetX.toFixed(3)}%, ${offsetY.toFixed(3)}%)`;
-            videoWrapperRef.current.style.transformOrigin = 'center center';
+            // Direct zoom IN to target point - zoom in place at target location
+            videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)})`;
+            videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`; // Zoom from target point, not center
             videoWrapperRef.current.style.transition = 'transform 0.3s ease'; // Smooth, natural movement
             videoWrapperRef.current.style.willChange = 'transform';
           }
         } else {
           if (videoWrapperRef.current) {
-            // Smooth zoom OUT with natural, gentle movement
+            // Direct zoom OUT from zoom point back to fullscreen - no center transition
             videoWrapperRef.current.style.transform = 'none';
-            videoWrapperRef.current.style.transformOrigin = 'center center';
+            videoWrapperRef.current.style.transformOrigin = 'center center'; // Reset to center for normal view
             videoWrapperRef.current.style.transition = 'transform 0.3s ease'; // Smooth, natural movement
             videoWrapperRef.current.style.willChange = 'auto';
           }
