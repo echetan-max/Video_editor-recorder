@@ -236,28 +236,28 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // INSTANT ZOOM TRANSITIONS - Direct snap to position, no movement paths
+    // SMOOTH ZOOM TRANSITIONS - Natural smooth feel, no specific path types
     useEffect(() => {
       if (videoWrapperRef.current) {
         if (currentZoom) {
           const { x, y, scale } = currentZoom;
           
-          // Store zoom position for instant zoom out
+          // Store zoom position for smooth zoom out
           lastZoomPositionRef.current = { x, y };
           
-          // INSTANT ZOOM IN - Direct snap to target point (no movement)
+          // SMOOTH ZOOM IN - Natural smooth transition to target point
           videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)})`;
           videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
-          videoWrapperRef.current.style.transition = 'none'; // NO TRANSITION = instant snap
+          videoWrapperRef.current.style.transition = 'transform 0.4s ease'; // SMOOTH, natural feel
           videoWrapperRef.current.style.willChange = 'transform';
         } else {
-          // INSTANT ZOOM OUT - Direct snap back to fullscreen (no movement)
+          // SMOOTH ZOOM OUT - Natural smooth transition back to fullscreen
           const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
           
-          // Instant snap: scale down and return to center
+          // Smooth transition: scale down and return to center
           videoWrapperRef.current.style.transform = 'scale(1)';
           videoWrapperRef.current.style.transformOrigin = 'center center';
-          videoWrapperRef.current.style.transition = 'none'; // NO TRANSITION = instant snap
+          videoWrapperRef.current.style.transition = 'transform 0.4s ease'; // SMOOTH, natural feel
           videoWrapperRef.current.style.willChange = 'auto';
         }
       }
