@@ -236,7 +236,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // SMOOTH ZOOM TRANSITIONS - Fast, smooth, no jerks
+    // LINEAR ZOOM TRANSITIONS - Fast, straight-line paths, no curves
     useEffect(() => {
       if (videoWrapperRef.current) {
         if (currentZoom) {
@@ -245,19 +245,19 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           // Store zoom position for smooth zoom out
           lastZoomPositionRef.current = { x, y };
           
-          // SMOOTH ZOOM IN - One clean transition
+          // LINEAR ZOOM IN - Straight line to target point
           videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)})`;
           videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
-          videoWrapperRef.current.style.transition = 'transform 0.8s ease-out';
+          videoWrapperRef.current.style.transition = 'transform 0.8s linear';
           videoWrapperRef.current.style.willChange = 'transform';
         } else {
-          // SMOOTH ZOOM OUT - One clean transition back to fullscreen
+          // LINEAR ZOOM OUT - Straight line back to fullscreen
           const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
           
-          // Single smooth transition: scale down while moving to center
+          // Single linear transition: scale down while moving to center
           videoWrapperRef.current.style.transform = 'scale(1)';
           videoWrapperRef.current.style.transformOrigin = 'center center';
-          videoWrapperRef.current.style.transition = 'transform 0.8s ease-out';
+          videoWrapperRef.current.style.transition = 'transform 0.8s linear';
           videoWrapperRef.current.style.willChange = 'transform';
           
           // Clean reset after transition
