@@ -90,8 +90,38 @@ export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): Zo
   for (let i = 0; i < sorted.length; i++) {
     const zoom = sorted[i];
     
-    // If we're within this zoom's time range, return it exactly (same as preview)
+    // If we're within this zoom's time range, apply smooth transitions
     if (time >= zoom.startTime && time <= zoom.endTime) {
+      const zoomDuration = zoom.endTime - zoom.startTime;
+      const transitionDuration = 0.4; // Same as CSS transition duration
+      
+      // Smooth transition IN (first 0.4s of zoom)
+      if (time < zoom.startTime + transitionDuration) {
+        const t = (time - zoom.startTime) / transitionDuration;
+        // Use cubic-bezier easing (same as CSS)
+        const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        return {
+          ...zoom,
+          x: lerp(50, zoom.x, easedT),
+          y: lerp(50, zoom.y, easedT),
+          scale: lerp(1.0, zoom.scale, easedT),
+        };
+      }
+      
+      // Smooth transition OUT (last 0.4s of zoom)
+      if (time > zoom.endTime - transitionDuration) {
+        const t = (zoom.endTime - time) / transitionDuration;
+        // Use cubic-bezier easing (same as CSS)
+        const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        return {
+          ...zoom,
+          x: lerp(50, zoom.x, easedT),
+          y: lerp(50, zoom.y, easedT),
+          scale: lerp(1.0, zoom.scale, easedT),
+        };
+      }
+      
+      // Middle of zoom (no transition, full zoom)
       return zoom;
     }
   }
