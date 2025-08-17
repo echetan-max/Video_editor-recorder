@@ -51,6 +51,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     });
     const suppressTimeUpdateRef = useRef(false);
 
+    // Track the last zoom point for proper zoom out
+    const lastZoomPointRef = useRef<{x: number, y: number} | null>(null);
+
     /** drawer that returns a fully drawn canvas (no ImageData) */
     const drawFrameToCanvas = async (zoomEffects: ZoomEffect[], overlays: TextOverlay[]) => {
       if (!videoRef.current || !isVideoReady) throw new Error('Video not ready for capture');
@@ -240,17 +243,40 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       
       if (currentZoom) {
         const { x, y, scale } = currentZoom;
+        
+        // Remember this zoom point for zoom out
+        lastZoomPointRef.current = { x, y };
+        
         // Set transform-origin to zoom point for direct scaling
         videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
         videoWrapperRef.current.style.transform = `scale(${scale})`;
         videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
         videoWrapperRef.current.style.willChange = 'transform';
       } else {
-        // Reset to default - no zoom
-        videoWrapperRef.current.style.transformOrigin = '50% 50%';
-        videoWrapperRef.current.style.transform = 'scale(1)';
-        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
-        videoWrapperRef.current.style.willChange = 'auto';
+        // Zoom out: use the last zoom point if available
+        const lastPoint = lastZoomPointRef.current;
+        if (lastPoint) {
+          // Scale down from the last zoom point
+          videoWrapperRef.current.style.transformOrigin = `${lastPoint.x}% ${lastPoint.y}%`;
+          videoWrapperRef.current.style.transform = 'scale(1)';
+          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+          videoWrapperRef.current.style.willChange = 'transform';
+          
+          // Clear the last zoom point after a delay (after transition completes)
+          setTimeout(() => {
+            if (videoWrapperRef.current && !currentZoom) {
+              videoWrapperRef.current.style.transformOrigin = '50% 50%';
+              videoWrapperRef.current.style.willChange = 'auto';
+            }
+            lastZoomPointRef.current = null;
+          }, 300);
+        } else {
+          // No previous zoom point, use center
+          videoWrapperRef.current.style.transformOrigin = '50% 50%';
+          videoWrapperRef.current.style.transform = 'scale(1)';
+          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+          videoWrapperRef.current.style.willChange = 'auto';
+        }
       }
     }, [currentZoom]);
 
