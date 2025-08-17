@@ -51,6 +51,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     });
     const suppressTimeUpdateRef = useRef(false);
 
+    // Track previous zoom state for smooth zoom out transitions
+    const prevZoomRef = useRef<ZoomEffect | null>(null);
+
     /** drawer that returns a fully drawn canvas (no ImageData) */
     const drawFrameToCanvas = async (zoomEffects: ZoomEffect[], overlays: TextOverlay[]) => {
       if (!videoRef.current || !isVideoReady) throw new Error('Video not ready for capture');
@@ -236,6 +239,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     // Handle zoom changes with smooth direct transitions
     useEffect(() => {
+      const prevZoom = prevZoomRef.current;
+      
       if (currentZoom) {
         const { x, y, scale } = currentZoom;
         
@@ -249,14 +254,38 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           videoWrapperRef.current.style.transition = `transform ${duration} ease-out`;
           videoWrapperRef.current.style.willChange = 'transform';
         }
+        
+        // Update previous zoom reference
+        prevZoomRef.current = currentZoom;
       } else {
-        // Reset to default state
+        // Zoom out: maintain the previous zoom point as transform-origin
         if (videoWrapperRef.current) {
-          videoWrapperRef.current.style.transformOrigin = '50% 50%';
-          videoWrapperRef.current.style.transform = 'scale(1)';
-          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
-          videoWrapperRef.current.style.willChange = 'auto';
+          if (prevZoom && prevZoom.id !== 'default') {
+            // Use the previous zoom point for zoom out transition
+            const transformOrigin = `${prevZoom.x}% ${prevZoom.y}%`;
+            videoWrapperRef.current.style.transformOrigin = transformOrigin;
+            videoWrapperRef.current.style.transform = 'scale(1)';
+            videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+            videoWrapperRef.current.style.willChange = 'transform';
+            
+            // After transition completes, reset to center for future operations
+            setTimeout(() => {
+              if (videoWrapperRef.current && !currentZoom) {
+                videoWrapperRef.current.style.transformOrigin = '50% 50%';
+                videoWrapperRef.current.style.willChange = 'auto';
+              }
+            }, 300);
+          } else {
+            // No previous zoom, just reset to center
+            videoWrapperRef.current.style.transformOrigin = '50% 50%';
+            videoWrapperRef.current.style.transform = 'scale(1)';
+            videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+            videoWrapperRef.current.style.willChange = 'auto';
+          }
         }
+        
+        // Clear previous zoom reference after zoom out
+        prevZoomRef.current = null;
       }
     }, [currentZoom]);
 
