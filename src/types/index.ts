@@ -67,43 +67,27 @@ export function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-// --- Export-specific zoom interpolation with smooth transitions ---
-export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffect {
-  const activeZoom = getInterpolatedZoom(time, zooms);
-
-  // If there's no specific zoom, or if it's an instant transition, return it directly
-  if (activeZoom.id === 'default' || activeZoom.transition === 'instant') {
-    return activeZoom;
+// --- Export-specific zoom interpolation - NO TRANSITIONS, just exact values ---
+export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffect | null {
+  if (!zooms.length) {
+    return null; // No zoom effects
   }
 
-  // Apply smooth transitions to the active zoom for natural feel
-  const zoomDuration = activeZoom.endTime - activeZoom.startTime;
-  const transitionDuration = Math.min(0.8, zoomDuration / 3); // 0.8s or 1/3 of zoom duration for FAST, smooth feel
-
-  // Smooth transition in
-  if (time < activeZoom.startTime + transitionDuration) {
-    const t = (time - activeZoom.startTime) / transitionDuration;
-    return {
-      ...activeZoom,
-      x: lerp(50, activeZoom.x, t),
-      y: lerp(50, activeZoom.y, t),
-      scale: lerp(1.0, activeZoom.scale, t),
-    };
+  // Sort zooms by start time
+  const sorted = [...zooms].sort((a, b) => a.startTime - b.startTime);
+  
+  // Find the active zoom for this exact time
+  for (let i = 0; i < sorted.length; i++) {
+    const zoom = sorted[i];
+    
+    // If we're within this zoom's time range, return it exactly (no interpolation)
+    if (time >= zoom.startTime && time <= zoom.endTime) {
+      return zoom;
+    }
   }
 
-  // Smooth transition out
-  if (time > activeZoom.endTime - transitionDuration) {
-    const t = (activeZoom.endTime - time) / transitionDuration;
-    return {
-      ...activeZoom,
-      x: lerp(50, activeZoom.x, t),
-      y: lerp(50, activeZoom.y, t),
-      scale: lerp(1.0, activeZoom.scale, t),
-    };
-  }
-
-  // If we are in the middle of the zoom (not in a transition period), return the zoom as is
-  return activeZoom;
+  // No zoom active at this time
+  return null;
 }
 
 // --- Robust zoom interpolation (matches preview and export, for all zoom types) ---

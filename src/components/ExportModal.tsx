@@ -187,7 +187,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       if (isCancelled.current) { dbg('webcodec capture loop cancelled'); return null; }
       const t = i / fps;
       const z = getExportInterpolatedZoom(t, sortedZooms);
-      const zooms = z ? [z] : [];
+      const zooms = z ? [z] : []; // z is now null when no zoom, so this works perfectly
       const texts = textOverlays.filter(ov => t >= ov.startTime && t <= ov.endTime);
 
       await videoPlayerRef.current!.seekAndWait(t);
@@ -288,7 +288,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       if (isCancelled.current) { dbg('ffmpeg capture loop cancelled'); return null; }
       const t = i / fps;
       const z = getExportInterpolatedZoom(t, sortedZooms);
-      const zooms = z ? [z] : [];
+      const zooms = z ? [z] : []; // z is now null when no zoom, so this works perfectly
       const texts = textOverlays.filter(ov => t >= ov.startTime && t <= ov.endTime);
 
       await videoPlayerRef.current!.seekAndWait(t);
