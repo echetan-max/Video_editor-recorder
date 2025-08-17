@@ -76,7 +76,7 @@ export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): Zo
 // --- Robust zoom interpolation (matches preview and export, for all zoom types) ---
 export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffect {
   if (!zooms.length) {
-    const result = {
+    return {
       id: 'default',
       startTime: 0,
       endTime: Number.MAX_SAFE_INTEGER,
@@ -85,8 +85,6 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
       scale: 1.0,
       transition: 'smooth',
     };
-    console.log('📍 getInterpolatedZoom - no zooms:', { time, result });
-    return result;
   }
 
   // Sort zooms by start time
@@ -94,7 +92,7 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
   
   // Before first zoom: no zoom (normal view)
   if (time < sorted[0].startTime) {
-    const result = {
+    return {
       id: 'default',
       startTime: 0,
       endTime: sorted[0].startTime,
@@ -103,13 +101,11 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
       scale: 1.0,
       transition: 'smooth',
     };
-    console.log('📍 getInterpolatedZoom - before first:', { time, firstStart: sorted[0].startTime, result });
-    return result;
   }
 
   // After last zoom: no zoom (normal view)
   if (time > sorted[sorted.length - 1].endTime) {
-    const result = {
+    return {
       id: 'default',
       startTime: sorted[sorted.length - 1].endTime,
       endTime: Number.MAX_SAFE_INTEGER,
@@ -118,8 +114,6 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
       scale: 1.0,
       transition: 'smooth',
     };
-    console.log('📍 getInterpolatedZoom - after last:', { time, lastEnd: sorted[sorted.length - 1].endTime, result });
-    return result;
   }
 
   // Find the active zoom
@@ -128,13 +122,12 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
     
     // If we're within this zoom's time range, return it exactly
     if (time >= currentZoom.startTime && time <= currentZoom.endTime) {
-      console.log('📍 getInterpolatedZoom - active zoom:', { time, zoom: currentZoom });
       return currentZoom;
     }
   }
 
   // If we're not in any zoom range, return normal view (no zoom)
-  const result = {
+  return {
     id: 'default',
     startTime: 0,
     endTime: Number.MAX_SAFE_INTEGER,
@@ -143,6 +136,4 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
     scale: 1.0,
     transition: 'smooth',
   };
-  console.log('📍 getInterpolatedZoom - fallback default:', { time, result });
-  return result;
 }

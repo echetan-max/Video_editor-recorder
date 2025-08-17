@@ -237,62 +237,37 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // Simple zoom handling - use zoom point as transform-origin to prevent curved paths
+    // Simple zoom handling - FIXED to zoom out from zoom point, not center
     useEffect(() => {
       if (!videoWrapperRef.current) return;
       
-      console.log('🎯 Zoom transition:', {
-        currentZoom: currentZoom ? {
-          id: currentZoom.id,
-          x: currentZoom.x,
-          y: currentZoom.y,
-          scale: currentZoom.scale
-        } : null,
-        savedPoint: currentZoomPointRef.current
-      });
-      
-      if (currentZoom) {
+      if (currentZoom && currentZoom.id !== 'default') {
+        // Real zoom effect - zoom in
         const { x, y, scale } = currentZoom;
-        
-        // Save the current zoom point
         currentZoomPointRef.current = { x, y };
-        console.log('💾 Saving zoom point:', { x, y });
         
-        // Key fix: Set transform-origin to the zoom point for direct scaling
         videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
         videoWrapperRef.current.style.transform = `scale(${scale})`;
         videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
         videoWrapperRef.current.style.willChange = 'transform';
-        console.log('🔍 Applied zoom:', `origin: ${x}% ${y}%, scale: ${scale}`);
-      } else {
-        // Zoom out: use the last zoom point if available to scale down from there
-        const lastPoint = currentZoomPointRef.current;
-        console.log('📤 Zoom out - last point:', lastPoint);
         
-        if (lastPoint) {
-          // Scale down from the zoom point, not from center
-          console.log('🎯 Zooming out from:', `${lastPoint.x}% ${lastPoint.y}%`);
-          videoWrapperRef.current.style.transformOrigin = `${lastPoint.x}% ${lastPoint.y}%`;
-          videoWrapperRef.current.style.transform = 'scale(1)';
-          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
-          videoWrapperRef.current.style.willChange = 'transform';
-          
-          // Reset to center after zoom out completes
-          setTimeout(() => {
-            if (videoWrapperRef.current && !currentZoom) {
-              console.log('🔄 Resetting to center after zoom out');
-              videoWrapperRef.current.style.transformOrigin = '50% 50%';
-            }
-            currentZoomPointRef.current = null;
-          }, 300);
-        } else {
-          console.log('❌ No previous zoom point, using center');
-          // No previous zoom point, use center
-          videoWrapperRef.current.style.transformOrigin = '50% 50%';
-          videoWrapperRef.current.style.transform = 'scale(1)';
-          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
-          videoWrapperRef.current.style.willChange = 'auto';
-        }
+      } else if (currentZoom && currentZoom.id === 'default' && currentZoomPointRef.current) {
+        // Default zoom (zoom out) - use the saved zoom point
+        const { x, y } = currentZoomPointRef.current;
+        
+        // KEY FIX: Keep transform-origin at zoom point during zoom out
+        videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
+        videoWrapperRef.current.style.transform = 'scale(1)';
+        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+        videoWrapperRef.current.style.willChange = 'transform';
+        
+      } else {
+        // No zoom at all
+        videoWrapperRef.current.style.transformOrigin = '50% 50%';
+        videoWrapperRef.current.style.transform = 'scale(1)';
+        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+        videoWrapperRef.current.style.willChange = 'auto';
+        currentZoomPointRef.current = null;
       }
     }, [currentZoom]);
 
