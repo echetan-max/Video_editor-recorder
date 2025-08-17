@@ -234,29 +234,25 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // Handle zoom changes with smooth direct transitions
+    // Handle zoom changes with simple, direct transitions
     useEffect(() => {
-      const v = videoRef.current; if (!v || !isVideoReady) return;
+      if (!videoWrapperRef.current) return;
+      
       if (currentZoom) {
         const { x, y, scale } = currentZoom;
-        const transformOrigin = `${x}% ${y}%`;
-        const duration = currentZoom.transition === 'smooth' ? '0.3s' : '0.1s';
-        if (videoWrapperRef.current) {
-          videoWrapperRef.current.style.transformOrigin = transformOrigin;
-          videoWrapperRef.current.style.transform = `scale(${scale})`;
-          videoWrapperRef.current.style.transition = `transform ${duration} ease-out`;
-          videoWrapperRef.current.style.willChange = 'transform';
-        }
+        // Set transform-origin to zoom point for direct scaling
+        videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
+        videoWrapperRef.current.style.transform = `scale(${scale})`;
+        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+        videoWrapperRef.current.style.willChange = 'transform';
       } else {
-        // Zoom out: maintain the previous zoom point as transform-origin
-        if (videoWrapperRef.current) {
-          videoWrapperRef.current.style.transformOrigin = '50% 50%';
-          videoWrapperRef.current.style.transform = 'scale(1)';
-          videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
-          videoWrapperRef.current.style.willChange = 'transform';
-        }
+        // Reset to default - no zoom
+        videoWrapperRef.current.style.transformOrigin = '50% 50%';
+        videoWrapperRef.current.style.transform = 'scale(1)';
+        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+        videoWrapperRef.current.style.willChange = 'auto';
       }
-    }, [currentZoom, isVideoReady]);
+    }, [currentZoom]);
 
     // Cleanup on unmount
     useEffect(() => {
