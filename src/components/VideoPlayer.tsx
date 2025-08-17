@@ -235,7 +235,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // preview transform with smooth, natural zoom transitions
+    // preview transform with smooth, direct linear zoom transitions (straight-line paths)
     useEffect(() => {
       // Clear any existing timeout
       if (zoomTimeoutRef.current) {
@@ -250,18 +250,18 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           const offsetY = (50 - y) * (scale - 1);
           
           if (videoWrapperRef.current) {
-            // Smooth zoom IN with natural, professional feel
+            // Smooth zoom IN with direct, straight-line path
             videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)}) translate(${offsetX.toFixed(3)}%, ${offsetY.toFixed(3)}%)`;
             videoWrapperRef.current.style.transformOrigin = 'center center';
-            videoWrapperRef.current.style.transition = 'transform 0.4s ease-out'; // Smooth, natural zoom in
+            videoWrapperRef.current.style.transition = 'transform 0.4s linear'; // LINEAR = straight line, no curves
             videoWrapperRef.current.style.willChange = 'transform';
           }
         } else {
           if (videoWrapperRef.current) {
-            // Smooth zoom OUT with natural, professional feel
+            // Smooth zoom OUT with direct, straight-line path
             videoWrapperRef.current.style.transform = 'none';
             videoWrapperRef.current.style.transformOrigin = 'center center';
-            videoWrapperRef.current.style.transition = 'transform 0.4s ease-out'; // Smooth, natural zoom out
+            videoWrapperRef.current.style.transition = 'transform 0.4s linear'; // LINEAR = straight line, no curves
             videoWrapperRef.current.style.willChange = 'auto';
           }
         }
