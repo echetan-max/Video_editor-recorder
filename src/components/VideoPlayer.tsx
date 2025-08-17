@@ -260,27 +260,11 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           }
         } else {
           if (videoWrapperRef.current) {
-            // Direct zoom OUT from zoom point back to fullscreen - no concentration effects
-            const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
-            
-            // Smoothly transition scale and position together to avoid pivoting
-            const currentScale = 1.0; // Target scale for fullscreen
-            const offsetX = (50 - lastPos.x) * (currentScale - 1);
-            const offsetY = (50 - lastPos.y) * (currentScale - 1);
-            
-            videoWrapperRef.current.style.transform = `scale(${currentScale}) translate(${offsetX.toFixed(3)}%, ${offsetY.toFixed(3)}%)`;
+            // Simple, clean zoom OUT - just smoothly return to normal view
+            videoWrapperRef.current.style.transform = 'none';
             videoWrapperRef.current.style.transformOrigin = 'center center';
             videoWrapperRef.current.style.transition = 'transform 0.3s ease';
-            videoWrapperRef.current.style.willChange = 'transform';
-            
-            // After transition completes, reset to clean normal view
-            setTimeout(() => {
-              if (videoWrapperRef.current) {
-                videoWrapperRef.current.style.transform = 'none';
-                videoWrapperRef.current.style.transition = 'none';
-                videoWrapperRef.current.style.willChange = 'auto';
-              }
-            }, 300);
+            videoWrapperRef.current.style.willChange = 'auto';
           }
         }
       }, 16); // 16ms debounce (roughly 60fps)
