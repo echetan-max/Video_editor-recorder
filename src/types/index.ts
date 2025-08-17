@@ -63,9 +63,8 @@ export interface ExportSettings {
 
 // --- Helper: Linear interpolation ---
 export function lerp(a: number, b: number, t: number) {
-  // Use easeInOutCubic for a smoother transition
-  const easedT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  return a + (b - a) * easedT;
+  // Use LINEAR interpolation for direct, straight-line transitions (no curves)
+  return a + (b - a) * t;
 }
 
 // --- Export-specific zoom interpolation with smooth transitions ---
@@ -77,9 +76,9 @@ export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): Zo
     return activeZoom;
   }
 
-  // Apply smooth transitions to the active zoom
+  // Apply fast, direct transitions to the active zoom
   const zoomDuration = activeZoom.endTime - activeZoom.startTime;
-  const transitionDuration = Math.min(1.2, zoomDuration / 2.5); // 1.2s or 1/2.5 of zoom duration
+  const transitionDuration = Math.min(0.3, zoomDuration / 4); // 0.3s or 1/4 of zoom duration for faster, direct feel
 
   // Smooth transition in
   if (time < activeZoom.startTime + transitionDuration) {

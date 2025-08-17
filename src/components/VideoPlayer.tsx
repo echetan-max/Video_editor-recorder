@@ -235,7 +235,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // preview transform with debouncing to prevent glitches
+    // preview transform with direct, linear transitions (no curved paths)
     useEffect(() => {
       // Clear any existing timeout
       if (zoomTimeoutRef.current) {
@@ -249,12 +249,12 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           const offsetX = (50 - x) * (scale - 1);
           const offsetY = (50 - y) * (scale - 1);
           
-          // Use shorter, more responsive transitions to reduce glitches
-          const dur = currentZoom.transition === 'smooth' ? '0.3s' : '0.1s';
-          const ease = 'ease-out';
+          // Fast, direct transitions - no curved paths
+          const dur = currentZoom.transition === 'smooth' ? '0.15s' : '0.05s';
+          const ease = 'linear'; // LINEAR = straight line, no curves
           
           if (videoWrapperRef.current) {
-            // Apply transform directly to avoid style.setProperty overhead
+            // Apply transform directly for clean, direct movement
             videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)}) translate(${offsetX.toFixed(3)}%, ${offsetY.toFixed(3)}%)`;
             videoWrapperRef.current.style.transformOrigin = 'center center';
             videoWrapperRef.current.style.transition = `transform ${dur} ${ease}`;
@@ -262,9 +262,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           }
         } else {
           if (videoWrapperRef.current) {
+            // Direct zoom out to 1x - straight line back to normal
             videoWrapperRef.current.style.transform = 'none';
             videoWrapperRef.current.style.transformOrigin = 'center center';
-            videoWrapperRef.current.style.transition = 'none';
+            videoWrapperRef.current.style.transition = 'linear 0.15s'; // Fast, direct zoom out
             videoWrapperRef.current.style.willChange = 'auto';
           }
         }
