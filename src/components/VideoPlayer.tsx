@@ -260,11 +260,34 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           }
         } else {
           if (videoWrapperRef.current) {
-            // Simple, clean zoom OUT - just smoothly return to normal view
-            videoWrapperRef.current.style.transform = 'none';
-            videoWrapperRef.current.style.transformOrigin = 'center center';
-            videoWrapperRef.current.style.transition = 'transform 3s ease'; // SLOW transition to observe behavior
-            videoWrapperRef.current.style.willChange = 'auto';
+            // PERFECT zoom OUT - smooth transition from zoom point to fullscreen without center pivoting
+            const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
+            
+            // Step 1: Smoothly scale back to 1x from the current zoom point (no center movement)
+            videoWrapperRef.current.style.transform = `scale(1)`;
+            videoWrapperRef.current.style.transformOrigin = `${lastPos.x}% ${lastPos.y}%`; // Keep origin at zoom point
+            videoWrapperRef.current.style.transition = 'transform 3s ease';
+            videoWrapperRef.current.style.willChange = 'transform';
+            
+            // Step 2: After scale transition, smoothly move to center position
+            setTimeout(() => {
+              if (videoWrapperRef.current) {
+                // Now smoothly move to center without scaling (just position change)
+                videoWrapperRef.current.style.transform = 'translate(0%, 0%)';
+                videoWrapperRef.current.style.transformOrigin = 'center center';
+                videoWrapperRef.current.style.transition = 'transform 1.5s ease';
+                videoWrapperRef.current.style.willChange = 'transform';
+                
+                // Step 3: Final clean reset
+                setTimeout(() => {
+                  if (videoWrapperRef.current) {
+                    videoWrapperRef.current.style.transform = 'none';
+                    videoWrapperRef.current.style.transition = 'none';
+                    videoWrapperRef.current.style.willChange = 'auto';
+                  }
+                }, 1500);
+              }
+            }, 3000); // Wait for scale transition to complete
           }
         }
       }, 16); // 16ms debounce (roughly 60fps)
