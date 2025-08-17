@@ -235,7 +235,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // preview transform with INSTANT zoom - no transitions, direct snapping
+    // preview transform with smooth, natural zoom transitions
     useEffect(() => {
       // Clear any existing timeout
       if (zoomTimeoutRef.current) {
@@ -250,18 +250,18 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           const offsetY = (50 - y) * (scale - 1);
           
           if (videoWrapperRef.current) {
-            // INSTANT zoom - no transitions, just snap to position
+            // Smooth zoom IN with natural, gentle movement
             videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)}) translate(${offsetX.toFixed(3)}%, ${offsetY.toFixed(3)}%)`;
             videoWrapperRef.current.style.transformOrigin = 'center center';
-            videoWrapperRef.current.style.transition = 'none'; // NO TRANSITION = instant snap
+            videoWrapperRef.current.style.transition = 'transform 0.3s ease'; // Smooth, natural movement
             videoWrapperRef.current.style.willChange = 'transform';
           }
         } else {
           if (videoWrapperRef.current) {
-            // INSTANT zoom out - no transitions, just snap back to 1x
+            // Smooth zoom OUT with natural, gentle movement
             videoWrapperRef.current.style.transform = 'none';
             videoWrapperRef.current.style.transformOrigin = 'center center';
-            videoWrapperRef.current.style.transition = 'none'; // NO TRANSITION = instant snap
+            videoWrapperRef.current.style.transition = 'transform 0.3s ease'; // Smooth, natural movement
             videoWrapperRef.current.style.willChange = 'auto';
           }
         }
