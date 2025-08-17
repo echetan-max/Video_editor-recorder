@@ -260,31 +260,24 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           }
         } else {
           if (videoWrapperRef.current) {
-            // SIMPLE AND EFFECTIVE: Fade-based zoom out that eliminates all movement issues
-            // First, quickly fade out the current zoom view
-            videoWrapperRef.current.style.opacity = '0.8';
-            videoWrapperRef.current.style.transition = 'opacity 0.5s ease';
+            // PERFECT ZOOM OUT: Smooth transition from zoom point (75%, 8%) back to fullscreen (1x)
+            const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
             
-            // After fade, smoothly return to normal view
+            // Create a smooth, direct path from zoom point back to fullscreen
+            // This eliminates all pivoting and center concentration issues
+            videoWrapperRef.current.style.transform = 'scale(1)';
+            videoWrapperRef.current.style.transformOrigin = `${lastPos.x}% ${lastPos.y}%`; // Zoom out FROM the zoom point
+            videoWrapperRef.current.style.transition = 'transform 3s ease';
+            videoWrapperRef.current.style.willChange = 'transform';
+            
+            // After transition completes, clean reset to normal view
             setTimeout(() => {
               if (videoWrapperRef.current) {
-                // Now smoothly scale and move to center
-                videoWrapperRef.current.style.transform = 'scale(1)';
-                videoWrapperRef.current.style.transformOrigin = 'center center';
-                videoWrapperRef.current.style.transition = 'transform 2.5s ease, opacity 0.5s ease';
-                videoWrapperRef.current.style.opacity = '1';
-                
-                // Final clean reset
-                setTimeout(() => {
-                  if (videoWrapperRef.current) {
-                    videoWrapperRef.current.style.transform = 'none';
-                    videoWrapperRef.current.style.transition = 'none';
-                    videoWrapperRef.current.style.opacity = '1';
-                    videoWrapperRef.current.style.willChange = 'auto';
-                  }
-                }, 2500);
+                videoWrapperRef.current.style.transform = 'none';
+                videoWrapperRef.current.style.transition = 'none';
+                videoWrapperRef.current.style.willChange = 'auto';
               }
-            }, 500);
+            }, 3000);
           }
         }
       }, 16); // 16ms debounce (roughly 60fps)
