@@ -255,7 +255,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             // Direct zoom IN to target point - zoom in place at target location
             videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)})`;
             videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`; // Zoom from target point, not center
-            videoWrapperRef.current.style.transition = 'transform 0.3s ease'; // Smooth, natural movement
+            videoWrapperRef.current.style.transition = 'transform 3s ease'; // SLOW transition to observe behavior
             videoWrapperRef.current.style.willChange = 'transform';
           }
         } else {
@@ -263,7 +263,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             // Simple, clean zoom OUT - just smoothly return to normal view
             videoWrapperRef.current.style.transform = 'none';
             videoWrapperRef.current.style.transformOrigin = 'center center';
-            videoWrapperRef.current.style.transition = 'transform 0.3s ease';
+            videoWrapperRef.current.style.transition = 'transform 3s ease'; // SLOW transition to observe behavior
             videoWrapperRef.current.style.willChange = 'auto';
           }
         }

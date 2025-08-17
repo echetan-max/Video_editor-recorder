@@ -78,7 +78,7 @@ export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): Zo
 
   // Apply smooth transitions to the active zoom for natural feel
   const zoomDuration = activeZoom.endTime - activeZoom.startTime;
-  const transitionDuration = Math.min(0.3, zoomDuration / 3); // 0.3s or 1/3 of zoom duration for natural feel
+  const transitionDuration = Math.min(3.0, zoomDuration / 2); // 3.0s or 1/2 of zoom duration for SLOW observation
 
   // Smooth transition in
   if (time < activeZoom.startTime + transitionDuration) {
