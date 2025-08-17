@@ -237,36 +237,70 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // Simple zoom handling - FIXED to zoom out from zoom point, not center
+    // Enhanced smooth zoom handling - professional quality transitions
     useEffect(() => {
       if (!videoWrapperRef.current) return;
       
       if (currentZoom && currentZoom.id !== 'default') {
-        // Real zoom effect - zoom in
+        // Real zoom effect - zoom in with smooth easing
         const { x, y, scale } = currentZoom;
         currentZoomPointRef.current = { x, y };
         
+        // Smoother zoom in transition
+        const duration = currentZoom.transition === 'smooth' ? '0.4s' : '0.15s';
+        const easing = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'; // easeOutQuad for smooth feel
+        
         videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
         videoWrapperRef.current.style.transform = `scale(${scale})`;
-        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+        videoWrapperRef.current.style.transition = `transform ${duration} ${easing}`;
         videoWrapperRef.current.style.willChange = 'transform';
         
+        // Force hardware acceleration for smoother performance
+        videoWrapperRef.current.style.backfaceVisibility = 'hidden';
+        videoWrapperRef.current.style.perspective = '1000px';
+        
       } else if (currentZoom && currentZoom.id === 'default' && currentZoomPointRef.current) {
-        // Default zoom (zoom out) - use the saved zoom point
+        // Enhanced zoom out - more natural and elegant
         const { x, y } = currentZoomPointRef.current;
+        
+        // Professional zoom out with optimized timing
+        const duration = '0.6s'; // Slightly longer for more elegant zoom out
+        const easing = 'cubic-bezier(0.165, 0.84, 0.44, 1)'; // easeOutQuart for smooth deceleration
         
         // KEY FIX: Keep transform-origin at zoom point during zoom out
         videoWrapperRef.current.style.transformOrigin = `${x}% ${y}%`;
         videoWrapperRef.current.style.transform = 'scale(1)';
-        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+        videoWrapperRef.current.style.transition = `transform ${duration} ${easing}`;
         videoWrapperRef.current.style.willChange = 'transform';
         
+        // Maintain hardware acceleration during zoom out
+        videoWrapperRef.current.style.backfaceVisibility = 'hidden';
+        videoWrapperRef.current.style.perspective = '1000px';
+        
+        // Gradually reset transform-origin to center after zoom out completes
+        setTimeout(() => {
+          if (videoWrapperRef.current && currentZoom?.id === 'default') {
+            videoWrapperRef.current.style.transition = 'transform-origin 0.3s ease-out';
+            videoWrapperRef.current.style.transformOrigin = '50% 50%';
+            
+            // Clean up hardware acceleration after transition
+            setTimeout(() => {
+              if (videoWrapperRef.current) {
+                videoWrapperRef.current.style.backfaceVisibility = '';
+                videoWrapperRef.current.style.perspective = '';
+              }
+            }, 300);
+          }
+        }, 600); // After zoom out animation completes
+        
       } else {
-        // No zoom at all
+        // No zoom at all - clean reset
         videoWrapperRef.current.style.transformOrigin = '50% 50%';
         videoWrapperRef.current.style.transform = 'scale(1)';
-        videoWrapperRef.current.style.transition = 'transform 0.3s ease-out';
+        videoWrapperRef.current.style.transition = 'transform 0.2s ease-out';
         videoWrapperRef.current.style.willChange = 'auto';
+        videoWrapperRef.current.style.backfaceVisibility = '';
+        videoWrapperRef.current.style.perspective = '';
         currentZoomPointRef.current = null;
       }
     }, [currentZoom]);
