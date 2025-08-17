@@ -260,34 +260,31 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           }
         } else {
           if (videoWrapperRef.current) {
-            // PERFECT zoom OUT - smooth transition from zoom point to fullscreen without center pivoting
-            const lastPos = lastZoomPositionRef.current || { x: 50, y: 50 };
+            // SIMPLE AND EFFECTIVE: Fade-based zoom out that eliminates all movement issues
+            // First, quickly fade out the current zoom view
+            videoWrapperRef.current.style.opacity = '0.8';
+            videoWrapperRef.current.style.transition = 'opacity 0.5s ease';
             
-            // Step 1: Smoothly scale back to 1x from the current zoom point (no center movement)
-            videoWrapperRef.current.style.transform = `scale(1)`;
-            videoWrapperRef.current.style.transformOrigin = `${lastPos.x}% ${lastPos.y}%`; // Keep origin at zoom point
-            videoWrapperRef.current.style.transition = 'transform 3s ease';
-            videoWrapperRef.current.style.willChange = 'transform';
-            
-            // Step 2: After scale transition, smoothly move to center position
+            // After fade, smoothly return to normal view
             setTimeout(() => {
               if (videoWrapperRef.current) {
-                // Now smoothly move to center without scaling (just position change)
-                videoWrapperRef.current.style.transform = 'translate(0%, 0%)';
+                // Now smoothly scale and move to center
+                videoWrapperRef.current.style.transform = 'scale(1)';
                 videoWrapperRef.current.style.transformOrigin = 'center center';
-                videoWrapperRef.current.style.transition = 'transform 1.5s ease';
-                videoWrapperRef.current.style.willChange = 'transform';
+                videoWrapperRef.current.style.transition = 'transform 2.5s ease, opacity 0.5s ease';
+                videoWrapperRef.current.style.opacity = '1';
                 
-                // Step 3: Final clean reset
+                // Final clean reset
                 setTimeout(() => {
                   if (videoWrapperRef.current) {
                     videoWrapperRef.current.style.transform = 'none';
                     videoWrapperRef.current.style.transition = 'none';
+                    videoWrapperRef.current.style.opacity = '1';
                     videoWrapperRef.current.style.willChange = 'auto';
                   }
-                }, 1500);
+                }, 2500);
               }
-            }, 3000); // Wait for scale transition to complete
+            }, 500);
           }
         }
       }, 16); // 16ms debounce (roughly 60fps)
