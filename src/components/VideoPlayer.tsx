@@ -50,7 +50,6 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       active: false, percent: 0, message: 'Preparing…'
     });
     const suppressTimeUpdateRef = useRef(false);
-    const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastZoomPositionRef = useRef<{x: number, y: number} | null>(null);
 
     /** drawer that returns a fully drawn canvas (no ImageData) */
@@ -283,14 +282,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       return () => document.removeEventListener('fullscreenchange', onFS);
     }, []);
 
-    // Cleanup zoom timeout on unmount
-    useEffect(() => {
-      return () => {
-        if (zoomTimeoutRef.current) {
-          clearTimeout(zoomTimeoutRef.current);
-        }
-      };
-    }, []);
+
 
     const getZoomIndicatorPosition = () => {
       const z = currentZoom || null;
