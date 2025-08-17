@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useRef, useState, useImperativeHandle } from 'react';
+import React, { forwardRef, useEffect, useRef, useState, useImperativeHandle, useCallback } from 'react';
 import { Play, Pause, Volume2, Maximize, VolumeX } from 'lucide-react';
 import { ZoomEffect, TextOverlay } from '../types';
 
@@ -50,6 +50,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       active: false, percent: 0, message: 'Preparing…'
     });
     const suppressTimeUpdateRef = useRef(false);
+    const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     /** drawer that returns a fully drawn canvas (no ImageData) */
     const drawFrameToCanvas = async (zoomEffects: ZoomEffect[], overlays: TextOverlay[]) => {
@@ -234,24 +235,40 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // preview transform
+    // preview transform with debouncing to prevent glitches
     useEffect(() => {
-      if (currentZoom) {
-        const { x, y, scale } = currentZoom;
-        const offsetX = (50 - x) * (scale - 1);
-        const offsetY = (50 - y) * (scale - 1);
-        const dur = currentZoom.transition === 'smooth' ? '0.6s' : '0.2s';
-        const ease = 'cubic-bezier(0.4, 0.0, 0.2, 1)';
-        videoWrapperRef.current?.style.setProperty('transform', `scale(${scale.toFixed(3)}) translate(${offsetX.toFixed(3)}%, ${offsetY.toFixed(3)}%)`);
-        videoWrapperRef.current?.style.setProperty('transform-origin', 'center center');
-        videoWrapperRef.current?.style.setProperty('transition', `transform ${dur} ${ease}`);
-        videoWrapperRef.current?.style.setProperty('will-change', 'transform');
-      } else {
-        videoWrapperRef.current?.style.setProperty('transform', 'none');
-        videoWrapperRef.current?.style.setProperty('transform-origin', 'center center');
-        videoWrapperRef.current?.style.setProperty('transition', 'none');
-        videoWrapperRef.current?.style.setProperty('will-change', 'none');
+      // Clear any existing timeout
+      if (zoomTimeoutRef.current) {
+        clearTimeout(zoomTimeoutRef.current);
       }
+      
+      // Debounce zoom changes to prevent rapid updates
+      zoomTimeoutRef.current = setTimeout(() => {
+        if (currentZoom) {
+          const { x, y, scale } = currentZoom;
+          const offsetX = (50 - x) * (scale - 1);
+          const offsetY = (50 - y) * (scale - 1);
+          
+          // Use shorter, more responsive transitions to reduce glitches
+          const dur = currentZoom.transition === 'smooth' ? '0.3s' : '0.1s';
+          const ease = 'ease-out';
+          
+          if (videoWrapperRef.current) {
+            // Apply transform directly to avoid style.setProperty overhead
+            videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)}) translate(${offsetX.toFixed(3)}%, ${offsetY.toFixed(3)}%)`;
+            videoWrapperRef.current.style.transformOrigin = 'center center';
+            videoWrapperRef.current.style.transition = `transform ${dur} ${ease}`;
+            videoWrapperRef.current.style.willChange = 'transform';
+          }
+        } else {
+          if (videoWrapperRef.current) {
+            videoWrapperRef.current.style.transform = 'none';
+            videoWrapperRef.current.style.transformOrigin = 'center center';
+            videoWrapperRef.current.style.transition = 'none';
+            videoWrapperRef.current.style.willChange = 'auto';
+          }
+        }
+      }, 16); // 16ms debounce (roughly 60fps)
     }, [currentZoom]);
 
     const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
@@ -272,6 +289,15 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       const onFS = () => setIsFullscreen(!!document.fullscreenElement);
       document.addEventListener('fullscreenchange', onFS);
       return () => document.removeEventListener('fullscreenchange', onFS);
+    }, []);
+
+    // Cleanup zoom timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (zoomTimeoutRef.current) {
+          clearTimeout(zoomTimeoutRef.current);
+        }
+      };
     }, []);
 
     const getZoomIndicatorPosition = () => {
@@ -326,7 +352,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
           <div
             className="relative w-full h-full max-w-full max-h-full"
-            style={{ backfaceVisibility: 'hidden', perspective: '1000px', transformStyle: 'preserve-3d' }}
+            style={{ transformStyle: 'flat' }}
             ref={videoWrapperRef}
           >
             <video
