@@ -63,48 +63,14 @@ export interface ExportSettings {
 
 // --- Helper: Linear interpolation ---
 export function lerp(a: number, b: number, t: number) {
-  // Use easeInOutCubic for a smoother transition
-  const easedT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  return a + (b - a) * easedT;
+  // Use linear interpolation for direct, smooth transitions
+  return a + (b - a) * t;
 }
 
 // --- Export-specific zoom interpolation with smooth transitions ---
 export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffect {
-  const activeZoom = getInterpolatedZoom(time, zooms);
-
-  // If there's no specific zoom, or if it's an instant transition, return it directly
-  if (activeZoom.id === 'default' || activeZoom.transition === 'instant') {
-    return activeZoom;
-  }
-
-  // Apply smooth transitions to the active zoom
-  const zoomDuration = activeZoom.endTime - activeZoom.startTime;
-  const transitionDuration = Math.min(1.2, zoomDuration / 2.5); // 1.2s or 1/2.5 of zoom duration
-
-  // Smooth transition in
-  if (time < activeZoom.startTime + transitionDuration) {
-    const t = (time - activeZoom.startTime) / transitionDuration;
-    return {
-      ...activeZoom,
-      x: lerp(50, activeZoom.x, t),
-      y: lerp(50, activeZoom.y, t),
-      scale: lerp(1.0, activeZoom.scale, t),
-    };
-  }
-
-  // Smooth transition out
-  if (time > activeZoom.endTime - transitionDuration) {
-    const t = (activeZoom.endTime - time) / transitionDuration;
-    return {
-      ...activeZoom,
-      x: lerp(50, activeZoom.x, t),
-      y: lerp(50, activeZoom.y, t),
-      scale: lerp(1.0, activeZoom.scale, t),
-    };
-  }
-
-  // If we are in the middle of the zoom (not in a transition period), return the zoom as is
-  return activeZoom;
+  // For export, use the same logic as preview to ensure consistency
+  return getInterpolatedZoom(time, zooms);
 }
 
 // --- Robust zoom interpolation (matches preview and export, for all zoom types) ---
