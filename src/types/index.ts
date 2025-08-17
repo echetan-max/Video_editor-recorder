@@ -90,8 +90,27 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
   // Sort zooms by start time
   const sorted = [...zooms].sort((a, b) => a.startTime - b.startTime);
   
-  // Before first zoom: no zoom (normal view)
+  // Define transition duration for smooth zoom out
+  const transitionDuration = 0.5; // 0.5 seconds for zoom out transition
+  
+  // Before first zoom: check if we're in a zoom-in transition
   if (time < sorted[0].startTime) {
+    // If we're close to the first zoom, start transitioning to it
+    if (time >= sorted[0].startTime - transitionDuration) {
+      const progress = (time - (sorted[0].startTime - transitionDuration)) / transitionDuration;
+      const t = Math.max(0, Math.min(1, progress));
+      
+      return {
+        id: `transition-to-${sorted[0].id}`,
+        startTime: sorted[0].startTime - transitionDuration,
+        endTime: sorted[0].startTime,
+        x: lerp(50, sorted[0].x, t),
+        y: lerp(50, sorted[0].y, t),
+        scale: lerp(1.0, sorted[0].scale, t),
+        transition: sorted[0].transition,
+      };
+    }
+    
     return {
       id: 'default',
       startTime: 0,
@@ -103,11 +122,28 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
     };
   }
 
-  // After last zoom: no zoom (normal view)
-  if (time > sorted[sorted.length - 1].endTime) {
+  // After last zoom: check if we're in a zoom-out transition
+  const lastZoom = sorted[sorted.length - 1];
+  if (time > lastZoom.endTime) {
+    // If we're close to the end of the last zoom, start transitioning out
+    if (time <= lastZoom.endTime + transitionDuration) {
+      const progress = (time - lastZoom.endTime) / transitionDuration;
+      const t = Math.max(0, Math.min(1, progress));
+      
+      return {
+        id: `transition-from-${lastZoom.id}`,
+        startTime: lastZoom.endTime,
+        endTime: lastZoom.endTime + transitionDuration,
+        x: lerp(lastZoom.x, 50, t),
+        y: lerp(lastZoom.y, 50, t),
+        scale: lerp(lastZoom.scale, 1.0, t),
+        transition: lastZoom.transition,
+      };
+    }
+    
     return {
       id: 'default',
-      startTime: sorted[sorted.length - 1].endTime,
+      startTime: lastZoom.endTime + transitionDuration,
       endTime: Number.MAX_SAFE_INTEGER,
       x: 50,
       y: 50,
@@ -116,13 +152,49 @@ export function getInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffe
     };
   }
 
-  // Find the active zoom
+  // Find the active zoom or transition between zooms
   for (let i = 0; i < sorted.length; i++) {
     const currentZoom = sorted[i];
     
     // If we're within this zoom's time range, return it exactly
     if (time >= currentZoom.startTime && time <= currentZoom.endTime) {
       return currentZoom;
+    }
+    
+    // Check if we're in a transition zone after this zoom
+    if (time > currentZoom.endTime && time <= currentZoom.endTime + transitionDuration) {
+      const nextZoom = sorted[i + 1];
+      
+      if (nextZoom && time < nextZoom.startTime - transitionDuration) {
+        // Transition from current zoom to default (zoom out)
+        const progress = (time - currentZoom.endTime) / transitionDuration;
+        const t = Math.max(0, Math.min(1, progress));
+        
+        return {
+          id: `transition-from-${currentZoom.id}`,
+          startTime: currentZoom.endTime,
+          endTime: currentZoom.endTime + transitionDuration,
+          x: lerp(currentZoom.x, 50, t),
+          y: lerp(currentZoom.y, 50, t),
+          scale: lerp(currentZoom.scale, 1.0, t),
+          transition: currentZoom.transition,
+        };
+      } else if (nextZoom) {
+        // Transition from current zoom to next zoom
+        const totalTransitionTime = nextZoom.startTime - currentZoom.endTime;
+        const progress = (time - currentZoom.endTime) / totalTransitionTime;
+        const t = Math.max(0, Math.min(1, progress));
+        
+        return {
+          id: `transition-${currentZoom.id}-to-${nextZoom.id}`,
+          startTime: currentZoom.endTime,
+          endTime: nextZoom.startTime,
+          x: lerp(currentZoom.x, nextZoom.x, t),
+          y: lerp(currentZoom.y, nextZoom.y, t),
+          scale: lerp(currentZoom.scale, nextZoom.scale, t),
+          transition: nextZoom.transition,
+        };
+      }
     }
   }
 
