@@ -1,20 +1,8 @@
-import React, { forwardRef, useEffect, useRef, useState, useImperativeHandle, useCallback } from 'react';
+import React, { forwardRef, useEffect, useRef, useState, useImperativeHandle } from 'react';
 import { Play, Pause, Volume2, Maximize, VolumeX } from 'lucide-react';
 import { ZoomEffect, TextOverlay } from '../types';
 
 const DEBUG_CAPTURE = false;
-
-// Helper function for linear interpolation
-const lerp = (start: number, end: number, progress: number): number => {
-  return start + (end - start) * progress;
-};
-
-// Zoom state for smooth transitions
-interface ZoomState {
-  x: number;
-  y: number;
-  scale: number;
-}
 
 interface VideoPlayerProps {
   src: string;
@@ -62,70 +50,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       active: false, percent: 0, message: 'Preparing…'
     });
     const suppressTimeUpdateRef = useRef(false);
-
-    // Smooth zoom transition state
-    const [currentZoomState, setCurrentZoomState] = useState<ZoomState>({ x: 50, y: 50, scale: 1 });
-    const [targetZoomState, setTargetZoomState] = useState<ZoomState>({ x: 50, y: 50, scale: 1 });
-    const transitionRef = useRef<{ startTime: number; duration: number; fromState: ZoomState; toState: ZoomState } | null>(null);
-    const animationFrameRef = useRef<number | null>(null);
-
-    // Smooth zoom transition animation
-    const animateZoomTransition = useCallback(() => {
-      if (!transitionRef.current) return;
-      
-      const now = performance.now();
-      const { startTime, duration, fromState, toState } = transitionRef.current;
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      // Linear interpolation for direct path
-      const newState: ZoomState = {
-        x: lerp(fromState.x, toState.x, progress),
-        y: lerp(fromState.y, toState.y, progress),
-        scale: lerp(fromState.scale, toState.scale, progress)
-      };
-      
-      setCurrentZoomState(newState);
-      
-      // Apply transform immediately
-      if (videoWrapperRef.current) {
-        const offsetX = (50 - newState.x) * (newState.scale - 1);
-        const offsetY = (50 - newState.y) * (newState.scale - 1);
-        videoWrapperRef.current.style.transform = `scale(${newState.scale.toFixed(3)}) translate(${offsetX.toFixed(3)}%, ${offsetY.toFixed(3)}%)`;
-      }
-      
-      if (progress < 1) {
-        animationFrameRef.current = requestAnimationFrame(animateZoomTransition);
-      } else {
-        transitionRef.current = null;
-        animationFrameRef.current = null;
-      }
-    }, []);
-
-    // Start a smooth transition between zoom states
-    const startZoomTransition = useCallback((fromState: ZoomState, toState: ZoomState, duration: number = 600) => {
-      // Cancel any existing transition
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      
-      // If states are the same, no need to transition
-      if (fromState.x === toState.x && fromState.y === toState.y && fromState.scale === toState.scale) {
-        setCurrentZoomState(toState);
-        return;
-      }
-      
-      transitionRef.current = {
-        startTime: performance.now(),
-        duration,
-        fromState,
-        toState
-      };
-      
-      setTargetZoomState(toState);
-      animationFrameRef.current = requestAnimationFrame(animateZoomTransition);
-    }, [animateZoomTransition]);
+    const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     /** drawer that returns a fully drawn canvas (no ImageData) */
     const drawFrameToCanvas = async (zoomEffects: ZoomEffect[], overlays: TextOverlay[]) => {
@@ -310,32 +235,41 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     useEffect(() => { const v = videoRef.current; if (v) v.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
 
-    // Handle zoom changes with smooth direct transitions
+    // preview transform with debouncing to prevent glitches
     useEffect(() => {
-      const newTargetState: ZoomState = currentZoom 
-        ? { x: currentZoom.x, y: currentZoom.y, scale: currentZoom.scale }
-        : { x: 50, y: 50, scale: 1 };
-      
-      // Set up video wrapper properties
-      if (videoWrapperRef.current) {
-        videoWrapperRef.current.style.transformOrigin = 'center center';
-        videoWrapperRef.current.style.transition = 'none';
-        videoWrapperRef.current.style.willChange = currentZoom ? 'transform' : 'none';
+      // Clear any existing timeout
+      if (zoomTimeoutRef.current) {
+        clearTimeout(zoomTimeoutRef.current);
       }
       
-      // Start smooth transition from current state to new target state
-      const duration = currentZoom?.transition === 'smooth' ? 600 : 200;
-      startZoomTransition(currentZoomState, newTargetState, duration);
-    }, [currentZoom, startZoomTransition, currentZoomState]);
-
-    // Cleanup animation frame on unmount
-    useEffect(() => {
-      return () => {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
+      // Debounce zoom changes to prevent rapid updates
+      zoomTimeoutRef.current = setTimeout(() => {
+        if (currentZoom) {
+          const { x, y, scale } = currentZoom;
+          const offsetX = (50 - x) * (scale - 1);
+          const offsetY = (50 - y) * (scale - 1);
+          
+          // Use shorter, more responsive transitions to reduce glitches
+          const dur = currentZoom.transition === 'smooth' ? '0.3s' : '0.1s';
+          const ease = 'ease-out';
+          
+          if (videoWrapperRef.current) {
+            // Apply transform directly to avoid style.setProperty overhead
+            videoWrapperRef.current.style.transform = `scale(${scale.toFixed(3)}) translate(${offsetX.toFixed(3)}%, ${offsetY.toFixed(3)}%)`;
+            videoWrapperRef.current.style.transformOrigin = 'center center';
+            videoWrapperRef.current.style.transition = `transform ${dur} ${ease}`;
+            videoWrapperRef.current.style.willChange = 'transform';
+          }
+        } else {
+          if (videoWrapperRef.current) {
+            videoWrapperRef.current.style.transform = 'none';
+            videoWrapperRef.current.style.transformOrigin = 'center center';
+            videoWrapperRef.current.style.transition = 'none';
+            videoWrapperRef.current.style.willChange = 'auto';
+          }
         }
-      };
-    }, []);
+      }, 16); // 16ms debounce (roughly 60fps)
+    }, [currentZoom]);
 
     const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -355,6 +289,15 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       const onFS = () => setIsFullscreen(!!document.fullscreenElement);
       document.addEventListener('fullscreenchange', onFS);
       return () => document.removeEventListener('fullscreenchange', onFS);
+    }, []);
+
+    // Cleanup zoom timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (zoomTimeoutRef.current) {
+          clearTimeout(zoomTimeoutRef.current);
+        }
+      };
     }, []);
 
     const getZoomIndicatorPosition = () => {
@@ -409,7 +352,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
           <div
             className="relative w-full h-full max-w-full max-h-full"
-            style={{ backfaceVisibility: 'hidden', perspective: '1000px', transformStyle: 'preserve-3d' }}
+            style={{ transformStyle: 'flat' }}
             ref={videoWrapperRef}
           >
             <video
