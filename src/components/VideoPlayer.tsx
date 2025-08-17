@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useRef, useState, useImperativeHandle, useCallback } from 'react';
+import React, { forwardRef, useEffect, useRef, useState, useImperativeHandle } from 'react';
 import { Play, Pause, Volume2, Maximize, VolumeX } from 'lucide-react';
 import { ZoomEffect, TextOverlay } from '../types';
 
