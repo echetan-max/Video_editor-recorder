@@ -40,6 +40,13 @@ export const VideoEditor: React.FC = () => {
     if (videoFile) {
       const url = URL.createObjectURL(videoFile);
       setVideoUrl(url);
+      // Preload FFmpeg as soon as a video is selected to avoid delays in ExportModal
+      (async () => {
+        try {
+          const { preloadFfmpeg } = await import('../lib/ffmpegService');
+          await preloadFfmpeg().catch(() => {});
+        } catch {}
+      })();
       return () => URL.revokeObjectURL(url);
     }
   }, [videoFile]);

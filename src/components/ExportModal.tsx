@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Download, Settings, AlertCircle, CheckCircle, Clock } from 'lucide-react';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { ZoomEffect, TextOverlay } from '../types';
 import { getExportInterpolatedZoom } from '../types';
@@ -29,7 +28,7 @@ interface ExportProgress {
 export const ExportModal: React.FC<ExportModalProps> = ({
   videoFile, zoomEffects, textOverlays, duration, onClose, videoPlayerRef
 }) => {
-  const [ffmpeg, setFfmpeg] = useState<FFmpeg | null>(null);
+  const [ffmpeg, setFfmpeg] = useState<import('@ffmpeg/ffmpeg').FFmpeg | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress>({
     stage: 'initializing', progress: 0, message: 'Initializing export...'
@@ -51,38 +50,30 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     if (error) console.error('[export/error]', error);
   }, [exportProgress]);
 
-  // FFmpeg (fallback + audio mux)
+  // FFmpeg (fallback + audio mux) - use singleton
   useEffect(() => {
     isCancelled.current = false;
-    const ffmpegInstance = new FFmpeg();
     (async () => {
       try {
-        setExportProgress({ stage: 'initializing', progress: 10, message: 'Loading FFmpeg...' });
-        ffmpegInstance.on('log', ({ message }: { message: string }) => { if (DEBUG_EXPORT) console.log('[ffmpeg]', message); });
-        ffmpegInstance.on('progress', (p: { progress: number }) => {
-          const percent = Math.round((p.progress ?? 0) * 100);
-          setExportProgress(prev => ({ ...prev, progress: Math.max(prev.progress, percent), message: `Loading FFmpeg: ${percent}%` }));
-        });
-        await ffmpegInstance.load();
-        setFfmpeg(ffmpegInstance);
-        setIsLoaded(true);
-        setExportProgress({ stage: 'initializing', progress: 100, message: 'FFmpeg loaded' });
-      } catch (e) {
-        if (e instanceof Error && e.message.includes('called FFmpeg.terminate()')) {
-          dbg('FFmpeg.load() interrupted by cleanup, probably due to React StrictMode. This is expected.');
-        } else {
-          console.warn('FFmpeg load failed (will still try WebCodecs):', e);
+        setExportProgress({ stage: 'initializing', progress: 10, message: 'Loading FFmpeg…' });
+        const { preloadFfmpeg, getFfmpegInstance, isFfmpegLoaded } = await import('../lib/ffmpegService');
+        if (!isFfmpegLoaded()) {
+          await preloadFfmpeg({
+            onProgress: (percent) => setExportProgress(prev => ({ ...prev, progress: Math.max(prev.progress, percent), message: `Loading FFmpeg: ${percent}%` })),
+            onLog: (message) => { if (DEBUG_EXPORT) console.log('[ffmpeg]', message); },
+          });
         }
+        const inst = getFfmpegInstance();
+        if (inst) {
+          setFfmpeg(inst);
+          setIsLoaded(true);
+          setExportProgress({ stage: 'initializing', progress: 100, message: 'FFmpeg loaded' });
+        }
+      } catch (e) {
+        console.warn('FFmpeg load failed (will still try WebCodecs):', e);
       }
     })();
-    return () => {
-      isCancelled.current = true;
-      try {
-        ffmpegInstance.terminate();
-      } catch {
-        // ignore
-      }
-    };
+    return () => { isCancelled.current = true; };
   }, []);
 
   const handleCancel = () => {
