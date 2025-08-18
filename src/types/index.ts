@@ -63,48 +63,71 @@ export interface ExportSettings {
 
 // --- Helper: Linear interpolation ---
 export function lerp(a: number, b: number, t: number) {
-  // Use easeInOutCubic for a smoother transition
-  const easedT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  return a + (b - a) * easedT;
+  // Use LINEAR interpolation for direct, straight-line transitions (no curves)
+  return a + (b - a) * t;
 }
 
-// --- Export-specific zoom interpolation with smooth transitions ---
-export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffect {
-  const activeZoom = getInterpolatedZoom(time, zooms);
-
-  // If there's no specific zoom, or if it's an instant transition, return it directly
-  if (activeZoom.id === 'default' || activeZoom.transition === 'instant') {
-    return activeZoom;
+// --- Export-specific zoom interpolation - EXACTLY matches preview smooth transitions ---
+export function getExportInterpolatedZoom(time: number, zooms: ZoomEffect[]): ZoomEffect | null {
+  if (!zooms.length) {
+    return null; // No zoom effects
   }
 
-  // Apply smooth transitions to the active zoom
-  const zoomDuration = activeZoom.endTime - activeZoom.startTime;
-  const transitionDuration = Math.min(1.2, zoomDuration / 2.5); // 1.2s or 1/2.5 of zoom duration
-
-  // Smooth transition in
-  if (time < activeZoom.startTime + transitionDuration) {
-    const t = (time - activeZoom.startTime) / transitionDuration;
-    return {
-      ...activeZoom,
-      x: lerp(50, activeZoom.x, t),
-      y: lerp(50, activeZoom.y, t),
-      scale: lerp(1.0, activeZoom.scale, t),
-    };
+  // Use the EXACT SAME logic as the preview for perfect sync
+  const sorted = [...zooms].sort((a, b) => a.startTime - b.startTime);
+  
+  // Before first zoom: no zoom (normal view)
+  if (time < sorted[0].startTime) {
+    return null; // No zoom effect
   }
 
-  // Smooth transition out
-  if (time > activeZoom.endTime - transitionDuration) {
-    const t = (activeZoom.endTime - time) / transitionDuration;
-    return {
-      ...activeZoom,
-      x: lerp(50, activeZoom.x, t),
-      y: lerp(50, activeZoom.y, t),
-      scale: lerp(1.0, activeZoom.scale, t),
-    };
+  // After last zoom: no zoom (normal view)
+  if (time > sorted[sorted.length - 1].endTime) {
+    return null; // No zoom effect
   }
 
-  // If we are in the middle of the zoom (not in a transition period), return the zoom as is
-  return activeZoom;
+  // Find the active zoom for this exact time
+  for (let i = 0; i < sorted.length; i++) {
+    const zoom = sorted[i];
+    
+    // If we're within this zoom's time range, apply smooth transitions
+    if (time >= zoom.startTime && time <= zoom.endTime) {
+      const zoomDuration = zoom.endTime - zoom.startTime;
+      const transitionDuration = 0.4; // Same as CSS transition duration
+      
+      // Smooth transition IN (first 0.4s of zoom)
+      if (time < zoom.startTime + transitionDuration) {
+        const t = (time - zoom.startTime) / transitionDuration;
+        // Use cubic-bezier easing (same as CSS)
+        const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        return {
+          ...zoom,
+          x: lerp(50, zoom.x, easedT),
+          y: lerp(50, zoom.y, easedT),
+          scale: lerp(1.0, zoom.scale, easedT),
+        };
+      }
+      
+      // Smooth transition OUT (last 0.4s of zoom)
+      if (time > zoom.endTime - transitionDuration) {
+        const t = (zoom.endTime - time) / transitionDuration;
+        // Use cubic-bezier easing (same as CSS)
+        const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        return {
+          ...zoom,
+          x: lerp(50, zoom.x, easedT),
+          y: lerp(50, zoom.y, easedT),
+          scale: lerp(1.0, zoom.scale, easedT),
+        };
+      }
+      
+      // Middle of zoom (no transition, full zoom)
+      return zoom;
+    }
+  }
+
+  // No zoom active at this time
+  return null;
 }
 
 // --- Robust zoom interpolation (matches preview and export, for all zoom types) ---

@@ -24,6 +24,7 @@ export const VideoEditor: React.FC = () => {
 
   const [zoomEnabled, setZoomEnabled] = useState(true);
   const [ffmpegStatus, setFfmpegStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [zoomEffectsVersion, setZoomEffectsVersion] = useState(0); // Force preview updates when zoom effects change
   const videoRef = useRef<VideoPlayerRef>(null);
 
   // Define deleteZoomEffect before using it
@@ -32,6 +33,7 @@ export const VideoEditor: React.FC = () => {
     if (selectedZoom?.id === id) {
       setSelectedZoom(null);
     }
+    setZoomEffectsVersion(prev => prev + 1); // Force preview update
   }, [selectedZoom]);
 
   useEffect(() => {
@@ -91,6 +93,7 @@ export const VideoEditor: React.FC = () => {
     };
     setZoomEffects(prev => [...prev, newZoom]);
     setSelectedZoom(newZoom);
+    setZoomEffectsVersion(prev => prev + 1); // Force preview update
   };
 
   const updateZoomEffect = (updatedZoom: ZoomEffect) => {
@@ -98,6 +101,7 @@ export const VideoEditor: React.FC = () => {
       prev.map(zoom => zoom.id === updatedZoom.id ? updatedZoom : zoom)
     );
     setSelectedZoom(updatedZoom);
+    setZoomEffectsVersion(prev => prev + 1); // Force preview update
   };
 
   // Text overlay functions
@@ -263,10 +267,14 @@ export const VideoEditor: React.FC = () => {
               const sortedZooms = [...zoomEffects].sort((a, b) => a.startTime - b.startTime);
               const interpolatedZoom = getInterpolatedZoom(currentTime, sortedZooms);
               
-              // Always return the interpolated zoom, even if it's the default zoom-out
-              // This ensures the preview shows the correct zoom state at all times
+              // Only return zoom if it's an actual zoom effect, not the default state
+              // This allows VideoPlayer to properly handle zoom out when currentZoom is null
+              if (interpolatedZoom.id === 'default' && interpolatedZoom.scale === 1.0) {
+                return null; // No zoom effect - VideoPlayer will handle zoom out
+              }
               return interpolatedZoom;
             })()}
+            zoomEffectsVersion={zoomEffectsVersion} // Force preview updates when zoom effects change
             textOverlays={textOverlays}
             previewTextOverlay={previewTextOverlay}
             onVideoClick={(x, y) => {
