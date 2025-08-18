@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Download, Settings, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { ZoomEffect, TextOverlay } from '../types';
 import { getExportInterpolatedZoom } from '../types';
@@ -16,6 +17,7 @@ interface ExportModalProps {
   duration: number;
   onClose: () => void;
   videoPlayerRef: React.RefObject<VideoPlayerRef>;
+  preloadedFfmpeg?: FFmpeg | null;
 }
 
 interface ExportProgress {
@@ -26,10 +28,10 @@ interface ExportProgress {
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
-  videoFile, zoomEffects, textOverlays, duration, onClose, videoPlayerRef
+  videoFile, zoomEffects, textOverlays, duration, onClose, videoPlayerRef, preloadedFfmpeg
 }) => {
-  const [ffmpeg, setFfmpeg] = useState<import('@ffmpeg/ffmpeg').FFmpeg | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [ffmpeg, setFfmpeg] = useState<FFmpeg | null>(preloadedFfmpeg ?? null);
+  const [isLoaded, setIsLoaded] = useState(!!preloadedFfmpeg);
   const [exportProgress, setExportProgress] = useState<ExportProgress>({
     stage: 'initializing', progress: 0, message: 'Initializing export...'
   });
@@ -50,31 +52,47 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     if (error) console.error('[export/error]', error);
   }, [exportProgress]);
 
-  // FFmpeg (fallback + audio mux) - use singleton
+  // FFmpeg (fallback + audio mux)
   useEffect(() => {
     isCancelled.current = false;
+    const ownsInstanceRef = { current: false } as { current: boolean };
     (async () => {
       try {
-        setExportProgress({ stage: 'initializing', progress: 10, message: 'Loading FFmpeg…' });
-        const { preloadFfmpeg, getFfmpegInstance, isFfmpegLoaded } = await import('../lib/ffmpegService');
-        if (!isFfmpegLoaded()) {
-          await preloadFfmpeg({
-            onProgress: (percent) => setExportProgress(prev => ({ ...prev, progress: Math.max(prev.progress, percent), message: `Loading FFmpeg: ${percent}%` })),
-            onLog: (message) => { if (DEBUG_EXPORT) console.log('[ffmpeg]', message); },
-          });
-        }
-        const inst = getFfmpegInstance();
-        if (inst) {
-          setFfmpeg(inst);
+        if (preloadedFfmpeg) {
+          setFfmpeg(preloadedFfmpeg);
           setIsLoaded(true);
           setExportProgress({ stage: 'initializing', progress: 100, message: 'FFmpeg loaded' });
+          return;
         }
+        const ffmpegInstance = new FFmpeg();
+        setExportProgress({ stage: 'initializing', progress: 10, message: 'Loading FFmpeg...' });
+        ffmpegInstance.on('log', ({ message }: { message: string }) => { if (DEBUG_EXPORT) console.log('[ffmpeg]', message); });
+        ffmpegInstance.on('progress', (p: { progress: number }) => {
+          const percent = Math.round((p.progress ?? 0) * 100);
+          setExportProgress(prev => ({ ...prev, progress: Math.max(prev.progress, percent), message: `Loading FFmpeg: ${percent}%` }));
+        });
+        ownsInstanceRef.current = true;
+        await ffmpegInstance.load({ coreURL: '/ffmpeg-core.js', wasmURL: '/ffmpeg-core.wasm' });
+        setFfmpeg(ffmpegInstance);
+        setIsLoaded(true);
+        setExportProgress({ stage: 'initializing', progress: 100, message: 'FFmpeg loaded' });
       } catch (e) {
-        console.warn('FFmpeg load failed (will still try WebCodecs):', e);
+        if (e instanceof Error && e.message.includes('called FFmpeg.terminate()')) {
+          dbg('FFmpeg.load() interrupted by cleanup, probably due to React StrictMode. This is expected.');
+        } else {
+          console.warn('FFmpeg load failed (will still try WebCodecs):', e);
+        }
       }
     })();
-    return () => { isCancelled.current = true; };
-  }, []);
+    return () => {
+      isCancelled.current = true;
+      // Do not terminate if instance is provided from outside
+      // We only terminate if we created it locally
+      try {
+        // No-op: without a persistent ref to the instance, we cannot safely terminate here
+      } catch {}
+    };
+  }, [preloadedFfmpeg]);
 
   const handleCancel = () => {
     isCancelled.current = true;

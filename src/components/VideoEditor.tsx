@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { Timeline } from './Timeline';
 import { ZoomControls } from './ZoomControls';
 import { Header } from './Header';
@@ -25,6 +26,7 @@ export const VideoEditor: React.FC = () => {
   const [zoomEnabled, setZoomEnabled] = useState(true);
   const [ffmpegStatus, setFfmpegStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [zoomEffectsVersion, setZoomEffectsVersion] = useState(0); // Force preview updates when zoom effects change
+  const [preloadedFfmpeg, setPreloadedFfmpeg] = useState<FFmpeg | null>(null);
   const videoRef = useRef<VideoPlayerRef>(null);
 
   // Define deleteZoomEffect before using it
@@ -40,14 +42,28 @@ export const VideoEditor: React.FC = () => {
     if (videoFile) {
       const url = URL.createObjectURL(videoFile);
       setVideoUrl(url);
-      // Preload FFmpeg as soon as a video is selected to avoid delays in ExportModal
+      // Preload FFmpeg as soon as a video is selected to avoid delays in Export
+      let cancelled = false;
+      let localInstance: FFmpeg | null = null;
       (async () => {
         try {
-          const { preloadFfmpeg } = await import('../lib/ffmpegService');
-          await preloadFfmpeg().catch(() => {});
-        } catch {}
+          const inst = new FFmpeg();
+          localInstance = inst;
+          await inst.load({ coreURL: '/ffmpeg-core.js', wasmURL: '/ffmpeg-core.wasm' });
+          if (!cancelled) setPreloadedFfmpeg(inst);
+        } catch (e) {
+          console.warn('FFmpeg preload failed:', e);
+          if (!cancelled) setPreloadedFfmpeg(null);
+        }
       })();
-      return () => URL.revokeObjectURL(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        cancelled = true;
+        try { localInstance?.terminate(); } catch {}
+      };
+    } else {
+      // Clear when no video
+      setPreloadedFfmpeg(null);
     }
   }, [videoFile]);
 
@@ -316,6 +332,7 @@ export const VideoEditor: React.FC = () => {
           duration={duration}
           onClose={() => setShowExportModal(false)}
           videoPlayerRef={videoRef}
+          preloadedFfmpeg={preloadedFfmpeg}
         />
       )}
 
